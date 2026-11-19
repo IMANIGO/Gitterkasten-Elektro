@@ -176,7 +176,10 @@ export function createCableMesh(points, material, radiusM = DEFAULT_CABLE_RADIUS
 }
 
 /**
- * Short colored cores at a cable end for Verklemmen.
+ * Colored cores at a cable end for Verklemmen.
+ * They leave the sheath mouth in a tight bundle and splay to a wide fan
+ * (outer cores about 28 mm off the centre line, stubs about 84 mm).
+ * A single core stays a straight stub.
  * @param {THREE.Vector3} tip end point of sheath
  * @param {THREE.Vector3} outward direction out of the sheath (away from run)
  * @param {{ id: string, label: string, color: number }[]} cores
@@ -187,7 +190,8 @@ export function createWireEndFan(tip, outward, cores, sheathRadiusM) {
   group.name = "Aderenden";
   const dir = outward.clone().normalize();
   const n = cores.length;
-  const stubLen = n === 1 ? 45 * MM : 85 * MM;
+  const single = n <= 1;
+  const stubLen = 84 * MM;
   const coreR = Math.max(1.15 * MM, sheathRadiusM * 0.2);
 
   // Orthonormal basis for fanning
@@ -195,20 +199,23 @@ export function createWireEndFan(tip, outward, cores, sheathRadiusM) {
   const side = new THREE.Vector3().crossVectors(dir, up).normalize();
   const binormal = new THREE.Vector3().crossVectors(side, dir).normalize();
 
-  const startSpread = Math.max(sheathRadiusM * 0.45, 1.2 * MM);
-  const endSpread = n <= 1 ? 0 : Math.max(26 * MM, 14 * MM * ((n - 1) / 2));
+  // Mouth: packed inside the sheath. Tips: ~28 mm off the centre line,
+  // so a 5-core cable opens to about 56 mm, with a small alternating lift.
+  const mouthLimit = Math.max(coreR * 0.35, sheathRadiusM - coreR * 1.15);
+  const packedOuter = single ? 0 : ((n - 1) / 2) * coreR * 1.15;
+  const startOuter = single ? 0 : Math.min(packedOuter, mouthLimit, sheathRadiusM * 0.5);
+  const endOuter = single ? 0 : 28 * MM;
+  const liftAmp = single ? 0 : 4.5 * MM;
 
   cores.forEach((core, i) => {
-    const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
-    const lift = n <= 2 ? 0 : (i % 2 === 0 ? 1 : -1);
-    const startOff = side.clone().multiplyScalar(t * startSpread);
-    const endOff = side
+    const t = single ? 0 : (i / (n - 1)) * 2 - 1;
+    const lift = single ? 0 : (i % 2 === 0 ? 1 : -1) * liftAmp;
+    const start = tip.clone().addScaledVector(side, t * startOuter);
+    const end = tip
       .clone()
-      .multiplyScalar(t * endSpread)
-      .add(binormal.clone().multiplyScalar(lift * endSpread * 0.22));
-
-    const start = tip.clone().add(startOff);
-    const end = tip.clone().addScaledVector(dir, stubLen).add(endOff);
+      .addScaledVector(dir, stubLen)
+      .addScaledVector(side, t * endOuter)
+      .addScaledVector(binormal, lift);
 
     const mid = start.clone().lerp(end, 0.5);
     const len = start.distanceTo(end);
