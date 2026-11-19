@@ -359,7 +359,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     } else if (next.mode === "verdrahtung") {
       libraryTitle.textContent = "Verdrahtung";
       libraryHint.textContent =
-        "Typ / Querschnitt / Adern wählen · Punkte auf Lochblech · Enter = Leitung + farbige Enden + Schellen";
+        "Typ / Querschnitt / Adern · Punkte auf beliebigen Flächen (Wechsel erlaubt) · Enter = Leitung + Schellen";
       libraryBody.hidden = true;
       placementFeedback.textContent = next.wiringFeedback || "Leitungspfad zeichnen";
     }

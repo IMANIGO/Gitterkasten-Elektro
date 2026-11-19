@@ -4,10 +4,7 @@ import { materials } from "../materials.js";
 import { createCableClamp } from "../models/cableClamp.js";
 import { setState, state } from "../state.js";
 import { MM, toMm } from "../units.js";
-import {
-  CLAMP_RULES_MM,
-  computeClampDistancesAlongPath,
-} from "./clampRules.js";
+import { computeClampDistancesAlongPath } from "./clampRules.js";
 import {
   coreColorsFor,
   formatCableSpec,
@@ -21,6 +18,12 @@ import {
   isLikelyBoxCorner,
   pointAtDistance,
 } from "./pathGeometry.js";
+import {
+  faceLabelDe,
+  faceNormal,
+  inferFaceAtPoint,
+  planWaypointAppend,
+} from "./wireFaces.js";
 
 const BOX_BOUNDS = {
   minX: -EBOX.width / 2 + EBOX.frame,
@@ -30,29 +33,6 @@ const BOX_BOUNDS = {
   minZ: EBOX.panelThickness,
   maxZ: EBOX.depth - EBOX.frame,
 };
-
-function snapWirePoint(point, face) {
-  const p = point.clone();
-  const pitch = 50 * MM;
-  if (face === "back") {
-    p.x = Math.round(p.x / pitch) * pitch;
-    p.y = Math.round((p.y - EBOX_FLOOR_Y) / pitch) * pitch + EBOX_FLOOR_Y;
-    p.z = EBOX.panelThickness + 8 * MM;
-  } else if (face === "floor") {
-    p.x = Math.round(p.x / pitch) * pitch;
-    p.z = Math.round(p.z / pitch) * pitch;
-    p.y = EBOX_FLOOR_Y + EBOX.panelThickness + 8 * MM;
-  } else if (face === "left") {
-    p.z = Math.round(p.z / pitch) * pitch;
-    p.y = Math.round((p.y - EBOX_FLOOR_Y) / pitch) * pitch + EBOX_FLOOR_Y;
-    p.x = -EBOX.width / 2 + EBOX.panelThickness + 8 * MM;
-  } else if (face === "right") {
-    p.z = Math.round(p.z / pitch) * pitch;
-    p.y = Math.round((p.y - EBOX_FLOOR_Y) / pitch) * pitch + EBOX_FLOOR_Y;
-    p.x = EBOX.width / 2 - EBOX.panelThickness - 8 * MM;
-  }
-  return p;
-}
 
 function findFace(object) {
   let current = object;
@@ -66,12 +46,7 @@ function findFace(object) {
 function orientClamp(clamp, point, tangent, face) {
   clamp.position.copy(point);
   const zAxis = tangent.clone().normalize();
-  let yAxis;
-  if (face === "back") yAxis = new THREE.Vector3(0, 0, 1);
-  else if (face === "floor") yAxis = new THREE.Vector3(0, 1, 0);
-  else if (face === "left") yAxis = new THREE.Vector3(1, 0, 0);
-  else if (face === "right") yAxis = new THREE.Vector3(-1, 0, 0);
-  else yAxis = new THREE.Vector3(0, 0, 1);
+  let yAxis = faceNormal(face);
 
   const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
   if (xAxis.lengthSq() < 1e-6) {
@@ -93,15 +68,18 @@ function sheathMaterial(spec) {
 }
 
 /**
- * Verdrahtung layer: click waypoints on Lochblech, finish run → cable + Schellen + Aderenden.
+ * Verdrahtung layer: click waypoints on any Lochblech faces → cable + Schellen + Aderenden.
  */
 export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
+  void controls;
   const group = new THREE.Group();
   group.name = "Verdrahtung";
 
   const runs = [];
+  /** @type {THREE.Vector3[]} */
   const draftPoints = [];
-  let draftFace = null;
+  /** @type {string[]} */
+  const draftFaces = [];
   let draftPreview = null;
   let markerGroup = new THREE.Group();
   group.add(markerGroup);
@@ -123,10 +101,10 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     }
   }
 
-  function addMarker(point) {
+  function addMarker(point, faceChanged = false) {
     const m = new THREE.Mesh(
       new THREE.SphereGeometry(6 * MM, 12, 12),
-      new THREE.MeshBasicMaterial({ color: 0xd4a017 }),
+      new THREE.MeshBasicMaterial({ color: faceChanged ? 0x3d8bfd : 0xd4a017 }),
     );
     m.position.copy(point);
     markerGroup.add(m);
@@ -150,10 +128,25 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     }
   }
 
+  function appendWaypoint(face, rawTarget) {
+    const planned = planWaypointAppend(draftPoints, draftFaces, face, rawTarget);
+    for (let i = 0; i < planned.points.length; i++) {
+      const pt = planned.points[i];
+      const f = planned.faces[i];
+      const faceChanged =
+        draftFaces.length > 0
+          ? f !== draftFaces[draftFaces.length - 1]
+          : false;
+      draftPoints.push(pt);
+      draftFaces.push(f);
+      addMarker(pt, faceChanged);
+    }
+  }
+
   function commitRun() {
     if (draftPoints.length < 2) {
       draftPoints.length = 0;
-      draftFace = null;
+      draftFaces.length = 0;
       clearDraftVisuals();
       setState({ wiringFeedback: "Leitung benötigt mindestens 2 Punkte" });
       return null;
@@ -182,7 +175,6 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       runGroup.add(cable);
     }
 
-    // Aderenden at both ends
     if (points.length >= 2) {
       const t0 = points[1].clone().sub(points[0]).normalize();
       const t1 = points[points.length - 1]
@@ -204,22 +196,18 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     for (const dist of distances) {
       const sample = pointAtDistance(points, dist);
       if (!sample) continue;
+      const face = inferFaceAtPoint(sample.point);
       const clamp = createCableClamp();
-      orientClamp(clamp, sample.point, sample.tangent, draftFace || "back");
-      const wallNormal =
-        draftFace === "floor"
-          ? new THREE.Vector3(0, 1, 0)
-          : draftFace === "left"
-            ? new THREE.Vector3(1, 0, 0)
-            : draftFace === "right"
-              ? new THREE.Vector3(-1, 0, 0)
-              : new THREE.Vector3(0, 0, 1);
-      clamp.position.addScaledVector(wallNormal, -2 * MM);
+      orientClamp(clamp, sample.point, sample.tangent, face);
+      clamp.position.addScaledVector(faceNormal(face), -2 * MM);
       clamp.userData.autoPlaced = true;
       clamp.userData.alongMm = toMm(dist);
+      clamp.userData.face = face;
       runGroup.add(clamp);
-      clamps.push({ distanceM: dist, distanceMm: toMm(dist) });
+      clamps.push({ distanceM: dist, distanceMm: toMm(dist), face });
     }
+
+    const facesUsed = [...new Set(draftFaces)];
 
     group.add(runGroup);
     const run = {
@@ -230,7 +218,9 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       lengthMm: toMm(length),
       clamps,
       bends,
-      face: draftFace,
+      face: facesUsed[0] || null,
+      faces: facesUsed,
+      cornerFaces: [...draftFaces],
       group: runGroup,
       cableSpec: { ...spec },
       label,
@@ -242,8 +232,13 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
         ? Math.round((clamps[1].distanceMm - clamps[0].distanceMm) * 10) / 10
         : null;
 
+    const faceText =
+      facesUsed.length > 1
+        ? facesUsed.map(faceLabelDe).join(" → ")
+        : faceLabelDe(facesUsed[0]);
+
     setState({
-      wiringFeedback: `${label} · ${run.lengthMm} mm · ${clamps.length} Schellen${
+      wiringFeedback: `${label} · ${run.lengthMm} mm · ${faceText} · ${clamps.length} Schellen${
         spacingMm != null ? ` · Abstand ${spacingMm} mm` : ""
       } · ${cores.map((c) => c.label).join("/")} Enden`,
       wireCount: runs.length,
@@ -251,7 +246,7 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     });
 
     draftPoints.length = 0;
-    draftFace = null;
+    draftFaces.length = 0;
     clearDraftVisuals();
     return run;
   }
@@ -281,43 +276,33 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     });
     if (!hits.length) return;
 
-    const face = findFace(hits[0].object);
-    if (!face) {
-      setState({ wiringFeedback: "Auf Lochblech klicken (Wand/Boden)" });
-      return;
-    }
-    if (draftFace && draftFace !== face && draftPoints.length > 0) {
-      setState({ wiringFeedback: "Leitung vorerst auf einer Fläche halten · Enter zum Abschluss" });
-      return;
-    }
-
-    draftFace = face;
-    const pt = snapWirePoint(hits[0].point, face);
-
-    if (draftPoints.length > 0) {
-      const last = draftPoints[draftPoints.length - 1];
-      const dx = Math.abs(pt.x - last.x);
-      const dy = Math.abs(pt.y - last.y);
-      const dz = Math.abs(pt.z - last.z);
-      if (face === "back") {
-        if (dx >= dy) pt.y = last.y;
-        else pt.x = last.x;
-      } else if (face === "floor") {
-        if (dx >= dz) pt.z = last.z;
-        else pt.x = last.x;
-      } else {
-        if (dz >= dy) pt.y = last.y;
-        else pt.z = last.z;
+    let face = null;
+    let hitPoint = null;
+    for (const hit of hits) {
+      const f = findFace(hit.object);
+      if (f) {
+        face = f;
+        hitPoint = hit.point;
+        break;
       }
-      if (pt.distanceTo(last) < 10 * MM) return;
+    }
+    if (!face) {
+      setState({
+        wiringFeedback: "Auf Lochblech klicken (Wand/Boden — Flächenwechsel erlaubt)",
+      });
+      return;
     }
 
-    draftPoints.push(pt);
-    addMarker(pt);
+    const prevFace = draftFaces.length ? draftFaces[draftFaces.length - 1] : null;
+    appendWaypoint(face, hitPoint);
     refreshDraftPreview();
     const spec = currentSpec();
+    const switchNote =
+      prevFace && prevFace !== face
+        ? ` · Wechsel ${faceLabelDe(prevFace)} → ${faceLabelDe(face)}`
+        : "";
     setState({
-      wiringFeedback: `${formatCableSpec(spec)} · Punkt ${draftPoints.length} · Enter = fertig`,
+      wiringFeedback: `${formatCableSpec(spec)} · Punkt ${draftPoints.length} · ${faceLabelDe(face)}${switchNote} · Enter = fertig`,
     });
   }
 
@@ -333,19 +318,26 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       commitRun();
     } else if (event.key === "Escape") {
       draftPoints.length = 0;
-      draftFace = null;
+      draftFaces.length = 0;
       clearDraftVisuals();
       setState({ wiringFeedback: "Leitung verworfen" });
     } else if (event.key === "Backspace" && draftPoints.length) {
       draftPoints.pop();
+      draftFaces.pop();
       clearDraftVisuals();
-      draftPoints.forEach(addMarker);
+      draftPoints.forEach((p, i) => {
+        const changed = i > 0 && draftFaces[i] !== draftFaces[i - 1];
+        addMarker(p, changed);
+      });
       refreshDraftPreview();
-      setState({ wiringFeedback: `Punkt ${draftPoints.length}` });
+      setState({
+        wiringFeedback: draftPoints.length
+          ? `Punkt ${draftPoints.length} · ${faceLabelDe(draftFaces[draftFaces.length - 1])}`
+          : "Leitungspfad zeichnen",
+      });
     }
   }
 
-  // Refresh preview diameter when cable spec changes
   let lastSpecKey = "";
   function syncSpecPreview() {
     const spec = currentSpec();
@@ -367,6 +359,17 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     group,
     wires: runs,
     addWire: commitRun,
+    /** Test/helper: append a waypoint without raycast */
+    debugAppend(face, point) {
+      appendWaypoint(face, point);
+      refreshDraftPreview();
+    },
+    getDraft() {
+      return {
+        points: draftPoints.map((p) => p.clone()),
+        faces: [...draftFaces],
+      };
+    },
     getTotalLengthMm() {
       return runs.reduce((s, r) => s + r.lengthMm, 0);
     },
