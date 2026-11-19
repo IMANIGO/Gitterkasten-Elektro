@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { EBOX, EBOX_CENTER_Y, EBOX_FLOOR_Y, UV_POSITION } from "../layout.js";
+import { EBOX, EBOX_CENTER_Y, EBOX_FLOOR_Y } from "../layout.js";
 import { setState, state } from "../state.js";
+import { UV_STAGE_CAMERA } from "./uvIsolate.js";
 
 const cx = 0;
 const cy = EBOX_CENTER_Y;
@@ -13,12 +14,8 @@ const PRESETS = {
     target: new THREE.Vector3(cx, cy - 0.05, cz),
   },
   uv: {
-    position: new THREE.Vector3(UV_POSITION.x + 0.22, UV_POSITION.y + 0.07, UV_POSITION.z + 0.42),
-    target: new THREE.Vector3(UV_POSITION.x, UV_POSITION.y - 0.01, UV_POSITION.z),
-  },
-  gitter: {
-    position: new THREE.Vector3(0.35, cy + 0.05, 0.55),
-    target: new THREE.Vector3(0.2, cy, 0.05),
+    position: UV_STAGE_CAMERA.position.clone(),
+    target: UV_STAGE_CAMERA.target.clone(),
   },
   draufsicht: {
     position: new THREE.Vector3(0.0, EBOX_FLOOR_Y + 1.35, cz + 0.05),

@@ -123,6 +123,13 @@ body {
   background: rgba(242, 240, 234, 0.08);
 }
 
+.presets button:disabled {
+  background: transparent;
+  color: #8a8680;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 button:disabled {
   color: #5c5954;
   cursor: not-allowed;

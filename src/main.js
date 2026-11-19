@@ -5,7 +5,8 @@ import { createEnvironment } from "./models/environment.js";
 import { createWorkbench } from "./models/workbench.js";
 import { createPlacementController } from "./placement/controller.js";
 import { createSelectionController } from "./selection/controller.js";
-import { createCamera } from "./scene/cameras.js";
+import { cameraPresets, createCamera } from "./scene/cameras.js";
+import { createUvIsolate } from "./scene/uvIsolate.js";
 import { createInteraction } from "./scene/interaction.js";
 import { addLighting } from "./scene/lighting.js";
 import { createRenderer } from "./scene/renderer.js";
@@ -27,7 +28,7 @@ import {
 
 const canvas = document.getElementById("viewport");
 const { renderer } = createRenderer(canvas);
-const { camera, controls, applyPreset, update: updateCamera } = createCamera(canvas);
+const { camera, controls, applyPreset: applyCameraPreset, update: updateCamera } = createCamera(canvas);
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x141618, 6, 14);
@@ -132,7 +133,52 @@ const plansApi = {
 
 captureLive();
 
+const uvIsolate = createUvIsolate({ scene, placedRoot });
+
+function syncUvButton() {
+  const button = document.querySelector('[data-preset="uv"]');
+  if (!button) return;
+  const on = uvIsolate.hasBoard();
+  button.disabled = !on;
+  button.title = on ? "Unterverteilung vor dem Kasten zeigen" : "Keine Unterverteilung platziert";
+  if (!on) button.classList.remove("active");
+}
+
+function applyPreset(id, opts) {
+  if (id === "uv") {
+    if (!uvIsolate.enter()) return false;
+    applyCameraPreset(id, opts);
+    syncUvButton();
+    return true;
+  }
+  if (!cameraPresets[id]) return false;
+  uvIsolate.leave();
+  applyCameraPreset(id, opts);
+  syncUvButton();
+  return true;
+}
+
+const beginMove = selection.beginMove.bind(selection);
+selection.beginMove = () => {
+  if (uvIsolate.isActive()) applyPreset("gesamt");
+  return beginMove();
+};
+
 bindUi({ applyPreset, takeoff, selection, plansApi });
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.target && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
+    const camMap = { 1: "gesamt", 2: "uv", 3: "draufsicht", 4: "draufsicht" };
+    const id = camMap[event.key];
+    if (!id) return;
+    event.stopImmediatePropagation();
+    applyPreset(id);
+  },
+  true,
+);
 
 let pointerDown = null;
 canvas.addEventListener("pointerdown", (event) => {
@@ -153,6 +199,8 @@ window.addEventListener("pointerup", (event) => {
 const clock = new THREE.Clock();
 function tick() {
   const dt = clock.getDelta();
+  if (uvIsolate.update() === "lost") applyPreset("gesamt");
+  syncUvButton();
   updateCamera(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
@@ -173,4 +221,5 @@ window.__pruefwand = {
   plansApi,
   state,
   setState,
+  uvView: uvIsolate,
 };
