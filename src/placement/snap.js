@@ -18,9 +18,9 @@ export function snapToGrid(value, origin = 0) {
 }
 
 /** Snap to TE (18 mm) along a DIN rail local X. */
-export function snapToTe(localX, teWidth = 1) {
+export function snapToTe(localX, teWidth = 1, railLength = UV.railLength) {
   const half = (teWidth * TE) / 2;
-  const railHalf = UV.railLength / 2;
+  const railHalf = railLength / 2;
   const min = -railHalf + half;
   const max = railHalf - half;
   const stepped = Math.round(localX / TE) * TE;
@@ -31,8 +31,8 @@ export function snapToTe(localX, teWidth = 1) {
  * Snap to abutting module width (e.g. 5,2 mm Federkraftklemmen) — no gap between neighbors.
  * Centers land on halfWidth + n * width so side faces touch.
  */
-export function snapToAbutting(localX, widthM) {
-  const railHalf = UV.railLength / 2;
+export function snapToAbutting(localX, widthM, railLength = UV.railLength) {
+  const railHalf = railLength / 2;
   const half = widthM / 2;
   const min = -railHalf + half;
   const max = railHalf - half;
@@ -163,6 +163,28 @@ export function poseOnLochblech(face, hitPoint, itemDepthM, { exact = false } = 
   return null;
 }
 
+function dinSpanBlocked(center, widthM, spans) {
+  const left = center - widthM / 2;
+  const right = center + widthM / 2;
+  return spans.some((span) => left < span.right - 0.3 * MM && right > span.left + 0.3 * MM);
+}
+
+/** Nächster freier Modulplatz auf der Schiene. `null`, wenn die Reihe voll ist. */
+export function nearestFreeDinX(localX, widthM, railLength, spans, abutting = false) {
+  const railHalf = railLength / 2;
+  const step = abutting ? widthM : TE;
+  const origin = -railHalf + widthM / 2;
+  const maxIndex = Math.max(0, Math.floor((railLength - widthM) / step + 1e-4));
+  let best = null;
+  for (let index = 0; index <= maxIndex; index += 1) {
+    const x = origin + index * step;
+    if (dinSpanBlocked(x, widthM, spans)) continue;
+    const dist = Math.abs(x - localX);
+    if (!best || dist < best.dist) best = { x, index, dist };
+  }
+  return best;
+}
+
 /**
  * Pose a DIN device on a rail group (local coords of rail).
  * @param {THREE.Object3D} railGroup
@@ -174,13 +196,26 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
   const abutting = typeof opts === "object" && opts.abutting && opts.widthM > 0;
   const widthM = abutting ? opts.widthM : teWidth * TE;
   const half = widthM / 2;
-  const railHalf = (opts.railLength || UV.railLength) / 2;
+  const railLength = opts.railLength || UV.railLength;
+  const railHalf = railLength / 2;
   const min = -railHalf + half;
   const max = railHalf - half;
-  const raw = abutting ? snapToAbutting(localPoint.x, widthM) : snapToTe(localPoint.x, teWidth);
-  const x = opts.exact ? Math.min(max, Math.max(min, localPoint.x)) : raw;
-  const origin = -UV.railLength / 2 + widthM / 2;
-  const teIndex = Math.max(0, Math.round((x - origin) / widthM));
+  const raw = abutting
+    ? snapToAbutting(localPoint.x, widthM, railLength)
+    : snapToTe(localPoint.x, teWidth, railLength);
+  const clamped = Math.min(max, Math.max(min, localPoint.x));
+  const spans = Array.isArray(opts.spans) ? opts.spans : null;
+  let x = opts.exact ? clamped : raw;
+  let teIndex = Math.max(0, Math.round((x - (-railHalf + half)) / (abutting ? widthM : TE)));
+  if (spans) {
+    const exactFree = opts.exact && !dinSpanBlocked(x, widthM, spans);
+    if (!exactFree) {
+      const free = nearestFreeDinX(opts.exact ? clamped : raw, widthM, railLength, spans, abutting);
+      if (!free) return null;
+      x = free.x;
+      teIndex = free.index;
+    }
+  }
 
   return {
     position: { x, y: 6 * MM, z: 22 * MM },

@@ -3,7 +3,7 @@ import { UV } from "../layout.js";
 
 /**
  * Betriebsmittel-Katalog — maßstäblich, markenneutral.
- * Formsprache angelehnt an gängige Industrie-Klassen (Volta-/MCB-Modul,
+ * Formsprache angelehnt an gängige Industrie-Klassen (Kleinverteiler 3×12,
  * Federkraftklemmen 5,2 mm, AP-Quadrate, halogenfreie Abzweigdosen),
  * ohne Markennamen, Logos oder geschützte Typbezeichnungen am Modell.
  *
@@ -16,7 +16,7 @@ export const CATALOG_ITEMS = [
     group: "verteiler",
     label: "Unterverteilung 3-reihig",
     short: "UV 3R",
-    description: "Offenes Verteilergehäuse, 3 Hutschienen, N-/PE-Schienen",
+    description: "Aufputz 3×12 TE · N-/PE-Klemmenfeld · Geräteschlitze · Tür offen",
     mount: "lochblech",
     te: UV.te,
     widthMm: Math.round(UV.outerW / MM),

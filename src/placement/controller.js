@@ -6,6 +6,7 @@ import { rcdSpecKey } from "../models/rcdSpec.js";
 import { rcboSpecKey } from "../models/rcboSpec.js";
 import { setState, state } from "../state.js";
 import { poseOnDinRail, poseOnLochblech } from "./snap.js";
+import { MM, TE } from "../units.js";
 
 function findMountRoot(object) {
   let current = object;
@@ -92,7 +93,31 @@ export function createPlacementController({
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
-  function resolvePose(item, hits, { exact = false } = {}) {
+  function railSpans(rail, ignore) {
+    const spans = [];
+    if (!rail) return spans;
+    for (const child of rail.children) {
+      if (child === ignore || child.userData?.ghost) continue;
+      let skip = false;
+      let node = child;
+      while (node) {
+        if (node === ignore) skip = true;
+        node = node.parent;
+      }
+      if (skip || !child.userData?.catalogId || !child.userData?.placed) continue;
+      const placed = getCatalogItem(child.userData.catalogId);
+      const width =
+        child.userData.placement?.widthM ||
+        (placed?.abutting && placed.widthMm ? placed.widthMm * MM : (placed?.te || 1) * TE);
+      spans.push({
+        left: child.position.x - width / 2,
+        right: child.position.x + width / 2,
+      });
+    }
+    return spans;
+  }
+
+  function resolvePose(item, hits, { exact = false, ignore = null } = {}) {
     if (!hits.length) return null;
     const mountWanted = item.mount;
 
@@ -108,12 +133,14 @@ export function createPlacementController({
               widthMm: item.widthMm,
               exact,
               railLength: rail.userData?.railLength,
+              spans: railSpans(rail, ignore),
             });
           }
           return poseOnDinRail(rail, local, {
             teWidth: item.te || 1,
             exact,
             railLength: rail.userData?.railLength,
+            spans: railSpans(rail, ignore),
           });
         }
       }
@@ -171,7 +198,10 @@ export function createPlacementController({
 
     if (!pose) {
       g.visible = false;
-      setState({ placementFeedback: "Keine passende Montagefläche" });
+      const onRail = hits.some((hit) => findDinRail(hit.object));
+      setState({
+        placementFeedback: onRail ? "Diese Reihe ist voll" : "Keine passende Montagefläche",
+      });
       return;
     }
 
@@ -283,7 +313,7 @@ export function createPlacementController({
     clearGhost,
     resolvePose,
     poseAtEvent(event, item, { exact = false, ignore = null } = {}) {
-      return resolvePose(item, hitsFromEvent(event, ignore), { exact });
+      return resolvePose(item, hitsFromEvent(event, ignore), { exact, ignore });
     },
     listDinRails() {
       const rails = [];

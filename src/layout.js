@@ -57,16 +57,21 @@ export const GRID_BOTTOM_Y = EBOX_FLOOR_Y + EBOX.frame;
 export const GRID_CENTER_Y = EBOX_CENTER_Y;
 export const GRID_Z = EBOX_BACK_Z;
 
-/** Compact 3-row UV for the E-Box back wall (~18 TE fits better). */
+/**
+ * Aufputz-Kleinverteiler, 3 Reihen × 12 TE.
+ * Proportionen eines üblichen 3×12-Gehäuses (etwa 305 × 515 × 97 mm),
+ * die Höhe bleibt in der lichten E-Box-Öffnung.
+ */
 export const UV = {
-  te: 18,
+  te: 12,
   rows: 3,
-  outerW: 370 * MM,
-  outerH: 420 * MM,
-  outerD: 96 * MM,
+  outerW: 305 * MM,
+  outerH: 480 * MM,
+  outerD: 96.5 * MM,
   wall: 8 * MM,
-  railPitch: 110 * MM,
-  railLength: 18 * TE,
+  railPitch: 118 * MM,
+  railLength: 12 * TE,
+  slotH: 46 * MM,
   dinWidth: 35 * MM,
   dinHeight: 7.5 * MM,
 };

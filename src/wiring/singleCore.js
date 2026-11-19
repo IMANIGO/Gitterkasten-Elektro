@@ -38,7 +38,7 @@ function snapUvDuct(uv, worldPoint, circuitKind) {
   const local = uv.worldToLocal(worldPoint.clone());
   const innerW = UV.outerW - 2 * UV.wall;
   const innerH = UV.outerH - 2 * UV.wall;
-  const ductX = innerW / 2 - 28 * MM;
+  const ductX = innerW / 2 - 22 * MM;
   const innerBack = -UV.outerD / 2 + UV.wall + 6 * MM;
   local.x = circuitKind === "steuer" ? ductX : -ductX;
   local.z = innerBack + 22 * MM;

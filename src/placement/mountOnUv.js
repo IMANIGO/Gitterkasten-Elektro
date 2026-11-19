@@ -1,7 +1,7 @@
 import { createFromFactory } from "../models/factories.js";
 import { getCatalogItem } from "../catalog/index.js";
 import { poseOnDinRail } from "./snap.js";
-import { MM } from "../units.js";
+import { MM, TE } from "../units.js";
 
 /**
  * Collect DIN rail groups inside a UV (top row first).
@@ -33,11 +33,20 @@ export function mountCatalogOnUvRail(uvRoot, catalogId, { row = 0, teIndex = 0 }
   // Approximate local X from TE index (left-origin)
   const half = widthM / 2;
   const railHalf = rail.userData.railLength / 2;
-  const localX = -railHalf + half + teIndex * widthM;
+  const step = item.abutting ? widthM : TE;
+  const localX = -railHalf + half + teIndex * step;
 
+  const spans = [];
+  for (const child of rail.children) {
+    if (!child.userData?.catalogId || !child.userData?.placed) continue;
+    const placed = getCatalogItem(child.userData.catalogId);
+    const spanW = placed?.abutting && placed.widthMm ? placed.widthMm * MM : (placed?.te || 1) * TE;
+    spans.push({ left: child.position.x - spanW / 2, right: child.position.x + spanW / 2 });
+  }
   const pose = poseOnDinRail(rail, { x: localX, y: 0, z: 0 }, item.abutting
-    ? { abutting: true, widthM, widthMm: item.widthMm }
-    : { teWidth: item.te || 1 });
+    ? { abutting: true, widthM, widthMm: item.widthMm, railLength: rail.userData?.railLength, spans }
+    : { teWidth: item.te || 1, railLength: rail.userData?.railLength, spans });
+  if (!pose) return null;
 
   pose.parent.add(object);
   object.position.set(pose.position.x, pose.position.y, pose.position.z);
@@ -61,15 +70,26 @@ export function mountCatalogOnUvRail(uvRoot, catalogId, { row = 0, teIndex = 0 }
 export function mountDemoProtectionLineup(uvRoot) {
   const mounted = [];
   const lineup = [
-    { catalogId: "fi-4p", row: 0, teIndex: 0 },
-    { catalogId: "ls-3p", row: 0, teIndex: 4 },
-    { catalogId: "ls-1p", row: 1, teIndex: 0 },
-    { catalogId: "ls-1p", row: 1, teIndex: 1 },
-    { catalogId: "fils-1p", row: 1, teIndex: 2 },
-    { catalogId: "reihenklemme-l", row: 2, teIndex: 0 },
-    { catalogId: "reihenklemme-l", row: 2, teIndex: 1 },
-    { catalogId: "reihenklemme-n", row: 2, teIndex: 2 },
-    { catalogId: "reihenklemme-pe", row: 2, teIndex: 3 },
+    { catalogId: "reihenklemme-l", row: 0, teIndex: 0 },
+    { catalogId: "reihenklemme-l", row: 0, teIndex: 1 },
+    { catalogId: "reihenklemme-n", row: 0, teIndex: 2 },
+    { catalogId: "reihenklemme-pe", row: 0, teIndex: 3 },
+    { catalogId: "fi-4p", row: 1, teIndex: 0 },
+    { catalogId: "ls-3p", row: 1, teIndex: 4 },
+    { catalogId: "ls-1p", row: 1, teIndex: 7 },
+    { catalogId: "ls-1p", row: 1, teIndex: 8 },
+    { catalogId: "ls-1p", row: 1, teIndex: 9 },
+    { catalogId: "ls-1p", row: 1, teIndex: 10 },
+    { catalogId: "ls-1p", row: 1, teIndex: 11 },
+    { catalogId: "fi-4p", row: 2, teIndex: 0 },
+    { catalogId: "ls-1p", row: 2, teIndex: 4 },
+    { catalogId: "ls-1p", row: 2, teIndex: 5 },
+    { catalogId: "ls-1p", row: 2, teIndex: 6 },
+    { catalogId: "ls-1p", row: 2, teIndex: 7 },
+    { catalogId: "ls-1p", row: 2, teIndex: 8 },
+    { catalogId: "ls-1p", row: 2, teIndex: 9 },
+    { catalogId: "ls-1p", row: 2, teIndex: 10 },
+    { catalogId: "ls-1p", row: 2, teIndex: 11 },
   ];
   for (const entry of lineup) {
     const o = mountCatalogOnUvRail(uvRoot, entry.catalogId, entry);

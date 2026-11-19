@@ -130,6 +130,14 @@ function createReihenklemme(kind) {
   return g;
 }
 
+function noRay(object) {
+  object.raycast = () => {};
+  object.traverse((child) => {
+    child.raycast = () => {};
+  });
+  return object;
+}
+
 function createHousing() {
   const g = new THREE.Group();
   g.name = "Gehaeuse";
@@ -137,7 +145,7 @@ function createHousing() {
     pickable: true,
     id: "uv-gehaeuse",
     name: "Unterverteilung, 3-reihig",
-    meta: `${UV.te} TE · ${UV.rows} Reihen · ${toMm(UV.outerW)} × ${toMm(UV.outerH)} × ${toMm(UV.outerD)} mm · offen`,
+    meta: `${UV.rows}×${UV.te} TE · ${toMm(UV.outerW)} × ${toMm(UV.outerH)} × ${toMm(UV.outerD)} mm · Aufputz`,
   };
 
   const w = UV.outerW;
@@ -147,18 +155,8 @@ function createHousing() {
   const hw = w / 2;
   const hh = h / 2;
   const hd = d / 2;
-
-  // Modular consumer-unit class: cool light-grey shell, warm interior backplane
-  const shell = new THREE.MeshStandardMaterial({
-    color: 0xd8dce0,
-    metalness: 0.12,
-    roughness: 0.48,
-  });
-  const shellDark = new THREE.MeshStandardMaterial({
-    color: 0xb8bec4,
-    metalness: 0.15,
-    roughness: 0.5,
-  });
+  const shell = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.52, metalness: 0.02 });
+  const shellDark = new THREE.MeshStandardMaterial({ color: 0xe4e0d6, roughness: 0.6, metalness: 0.03 });
 
   const back = mesh(new THREE.BoxGeometry(w, h, t), shellDark);
   back.position.z = -hd + t / 2;
@@ -173,40 +171,120 @@ function createHousing() {
   g.add(back, left, right, top, bottom);
 
   const plate = mesh(
-    new THREE.BoxGeometry(w - 2 * t - 4 * MM, h - 2 * t - 4 * MM, 2.5 * MM),
-    new THREE.MeshStandardMaterial({ color: 0xece8dc, metalness: 0.04, roughness: 0.68 }),
+    new THREE.BoxGeometry(w - 2 * t - 4 * MM, h - 2 * t - 4 * MM, 2 * MM),
+    new THREE.MeshStandardMaterial({ color: 0xe7e1d4, roughness: 0.72, metalness: 0.02 }),
   );
-  plate.position.z = -hd + t + 3 * MM;
+  plate.position.z = -hd + t + 2.5 * MM;
   g.add(plate);
 
-  // Front frame (door rebate) — thicker lip like open modular boards
-  const lip = 5 * MM;
-  const openingZ = hd - lip / 2;
-  const frameMat = new THREE.MeshStandardMaterial({
-    color: 0xeef1f4,
-    metalness: 0.08,
-    roughness: 0.42,
-  });
-  const frontTop = mesh(new THREE.BoxGeometry(w, lip, lip), frameMat);
-  frontTop.position.set(0, hh - lip / 2, openingZ);
-  const frontBottom = mesh(new THREE.BoxGeometry(w, lip, lip), frameMat);
-  frontBottom.position.set(0, -hh + lip / 2, openingZ);
-  const frontLeft = mesh(new THREE.BoxGeometry(lip, h - 2 * lip, lip), frameMat);
-  frontLeft.position.set(-hw + lip / 2, 0, openingZ);
-  const frontRight = mesh(new THREE.BoxGeometry(lip, h - 2 * lip, lip), frameMat);
-  frontRight.position.set(hw - lip / 2, 0, openingZ);
-  g.add(frontTop, frontBottom, frontLeft, frontRight);
-
-  // Corner hinges (visual only — open board)
-  for (const sy of [-1, 1]) {
-    const hinge = mesh(
-      new THREE.CylinderGeometry(3 * MM, 3 * MM, 14 * MM, 10),
-      materials.plasticBlack,
-    );
-    hinge.position.set(-hw + 3 * MM, sy * (hh - 28 * MM), hd - 2 * MM);
-    g.add(hinge);
+  const knockout = new THREE.MeshStandardMaterial({ color: 0xc8c2b6, roughness: 0.7, metalness: 0.04 });
+  for (const x of [-70, -25, 25, 70]) {
+    for (const y of [150, -170]) {
+      const oval = mesh(new THREE.CylinderGeometry(7 * MM, 7 * MM, 1.2 * MM, 16), knockout);
+      oval.rotation.x = Math.PI / 2;
+      oval.position.set(x * MM, y * MM, -hd + t + 0.8 * MM);
+      g.add(oval);
+    }
   }
 
+  return noRay(g);
+}
+
+function createCover(rowCenters) {
+  const g = new THREE.Group();
+  g.name = "Geraeteabdeckung";
+  const w = UV.outerW - 10 * MM;
+  const h = UV.outerH - 10 * MM;
+  const thick = 3.2 * MM;
+  const slotW = UV.railLength + 16 * MM;
+  const side = (w - slotW) / 2;
+  const mat = new THREE.MeshStandardMaterial({ color: 0xfbfaf6, roughness: 0.46, metalness: 0.03 });
+  const left = mesh(new THREE.BoxGeometry(side, h, thick), mat);
+  left.position.x = -w / 2 + side / 2;
+  const right = mesh(new THREE.BoxGeometry(side, h, thick), mat);
+  right.position.x = w / 2 - side / 2;
+  g.add(left, right);
+
+  const slots = [...rowCenters].sort((a, b) => b - a);
+  let cursor = h / 2;
+  for (const y of slots) {
+    const top = y + UV.slotH / 2;
+    const band = cursor - top;
+    if (band > 1 * MM) {
+      const strip = mesh(new THREE.BoxGeometry(slotW, band, thick), mat);
+      strip.position.set(0, top + band / 2, 0);
+      g.add(strip);
+    }
+    cursor = y - UV.slotH / 2;
+  }
+  const bottomBand = cursor + h / 2;
+  if (bottomBand > 1 * MM) {
+    const strip = mesh(new THREE.BoxGeometry(slotW, bottomBand, thick), mat);
+    strip.position.set(0, -h / 2 + bottomBand / 2, 0);
+    g.add(strip);
+  }
+  g.position.z = UV.outerD / 2 - 8 * MM;
+  return noRay(g);
+}
+
+function createDoor() {
+  const door = new THREE.Group();
+  door.name = "Tuer";
+  const leafW = UV.outerW - 8 * MM;
+  const leafH = UV.outerH - 8 * MM;
+  const mat = new THREE.MeshStandardMaterial({ color: 0xf7f4ee, roughness: 0.5, metalness: 0.04 });
+  const leaf = mesh(new THREE.BoxGeometry(leafW, leafH, 8 * MM), mat);
+  leaf.position.set(leafW / 2, 0, 5 * MM);
+  const grip = mesh(new THREE.BoxGeometry(8 * MM, 46 * MM, 6 * MM), materials.plasticBlack);
+  grip.position.set(leafW - 18 * MM, 0, 12 * MM);
+  door.add(leaf, grip);
+  door.position.set(-UV.outerW / 2 + 4 * MM, 0, UV.outerD / 2);
+  door.rotation.y = 1.15;
+  return noRay(door);
+}
+
+function createQcField(length) {
+  const g = new THREE.Group();
+  g.name = "Klemmenfeld";
+  const blocks = [
+    { id: "pe", name: "PE-Klemmenfeld", color: 0xc7a81a, fg: "#1a1a12", label: "PE", screws: 5, plugs: 8 },
+    { id: "n", name: "N-Klemmenfeld", color: 0x1f6fb2, fg: "#f4f7fb", label: "N", screws: 6, plugs: 10 },
+  ];
+  blocks.forEach((block, index) => {
+    const bw = length * 0.46;
+    const carrier = new THREE.Group();
+    const body = mesh(
+      new THREE.BoxGeometry(bw, 28 * MM, 18 * MM),
+      new THREE.MeshStandardMaterial({ color: block.color, roughness: 0.48, metalness: 0.06 }),
+    );
+    carrier.add(body);
+    for (let i = 0; i < block.screws; i += 1) {
+      const screw = createScrew(2.4 * MM);
+      screw.rotation.x = Math.PI / 2;
+      screw.position.set(-bw / 2 + 12 * MM + i * ((bw - 24 * MM) / (block.screws - 1)), 6 * MM, 8 * MM);
+      carrier.add(screw);
+    }
+    for (let i = 0; i < block.plugs; i += 1) {
+      const hole = mesh(
+        new THREE.CylinderGeometry(1.5 * MM, 1.5 * MM, 2 * MM, 8),
+        materials.plasticBlack,
+      );
+      hole.rotation.x = Math.PI / 2;
+      hole.position.set(-bw / 2 + 10 * MM + i * ((bw - 20 * MM) / (block.plugs - 1)), -6 * MM, 9 * MM);
+      carrier.add(hole);
+    }
+    const tag = makeTextPlate(block.label, 16, 8, { bg: block.fg === "#1a1a12" ? "#c7a81a" : "#1f6fb2", fg: block.fg, size: 72 });
+    tag.position.set(-bw / 2 + 2 * MM, 0, 10 * MM);
+    carrier.add(tag);
+    carrier.position.x = (index === 0 ? -1 : 1) * (length * 0.25);
+    carrier.userData = {
+      pickable: true,
+      id: `${block.id}-klemmenfeld`,
+      name: block.name,
+      meta: "Steckklemmen und Zugbügelklemmen · fest im Gehäuse",
+    };
+    g.add(carrier);
+  });
   return g;
 }
 
@@ -253,35 +331,41 @@ export function createDistributionBoard({
   const innerBack = -UV.outerD / 2 + UV.wall + 6 * MM;
   const railZ = innerBack + UV.dinHeight / 2 + 4 * MM;
 
+  const firstRailY = innerH / 2 - 168 * MM;
+  const rowCenters = [];
+  for (let row = 0; row < UV.rows; row += 1) {
+    rowCenters.push(firstRailY - row * UV.railPitch + 50 * MM);
+  }
+
   if (!ghost) {
-    const ductH = innerH - 20 * MM;
-    const ductX = innerW / 2 - 28 * MM;
+    const ductH = UV.railPitch * 2 + 70 * MM;
+    const ductX = innerW / 2 - 22 * MM;
+    const ductY = firstRailY - UV.railPitch;
     const leftDuct = createDuct(ductH);
-    leftDuct.position.set(-ductX, 0, innerBack + 22 * MM);
+    leftDuct.position.set(-ductX, ductY, innerBack + 18 * MM);
     leftDuct.userData = {
       pickable: true,
       id: "kabelkanal-links",
       name: "Verdrahtungskanal links",
-      meta: "25 × 40 mm · geschlitzt",
+      meta: "Laststrom · linker Rand",
     };
     const rightDuct = createDuct(ductH);
-    rightDuct.position.set(ductX, 0, innerBack + 22 * MM);
+    rightDuct.position.set(ductX, ductY, innerBack + 18 * MM);
     rightDuct.userData = {
       pickable: true,
       id: "kabelkanal-rechts",
       name: "Verdrahtungskanal rechts",
-      meta: "25 × 40 mm · geschlitzt",
+      meta: "Steuerkreis · rechter Rand",
     };
     root.add(leftDuct, rightDuct);
 
-    const pe = createBusbar("pe", UV.railLength, 12);
-    pe.position.set(0, innerH / 2 - 28 * MM, innerBack + 14 * MM);
-    const nBar = createBusbar("n", UV.railLength, 12);
-    nBar.position.set(0, innerH / 2 - 52 * MM, innerBack + 14 * MM);
-    root.add(pe, nBar);
+    const field = createQcField(UV.railLength + 20 * MM);
+    field.position.set(0, innerH / 2 - 42 * MM, innerBack + 16 * MM);
+    root.add(field);
+    root.add(createCover(rowCenters));
+    root.add(createDoor());
   }
 
-  const firstRailY = innerH / 2 - 95 * MM;
   const rows = [];
   for (let row = 0; row < UV.rows; row++) {
     const railGroup = new THREE.Group();
@@ -290,7 +374,7 @@ export function createDistributionBoard({
       pickable: true,
       id: `hutschiene-${row + 1}`,
       name: `Hutschiene Reihe ${row + 1}`,
-      meta: `TH35-7,5 · ${UV.te} TE · ${toMm(UV.railLength)} mm · Raster 18 mm`,
+      meta: `TH35-7,5 · ${UV.te} TE · ${toMm(UV.railLength)} mm · frei belegbar`,
       mount: "din",
       teCapacity: UV.te,
       railLength: UV.railLength,
@@ -298,9 +382,17 @@ export function createDistributionBoard({
     };
     const rail = createDinRail(UV.railLength);
     railGroup.add(rail);
+    const slot = new THREE.Mesh(
+      new THREE.PlaneGeometry(UV.railLength + 10 * MM, UV.slotH + 18 * MM),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    slot.name = "Reihenfeld";
+    slot.position.set(0, 50 * MM, 18 * MM);
+    railGroup.add(slot);
     if (!ghost) {
-      const label = makeTextPlate(`Reihe ${row + 1}`, 42, 9, { bg: "#2c3034", fg: "#f2f0ea", size: 52 });
-      label.position.set(-UV.railLength / 2 + 28 * MM, 24 * MM, 12 * MM);
+      const label = makeTextPlate(`Reihe ${row + 1}`, 36, 8, { bg: "#2c3034", fg: "#f2f0ea", size: 52 });
+      label.position.set(-UV.railLength / 2 + 22 * MM, 28 * MM, 14 * MM);
+      noRay(label);
       railGroup.add(label);
     }
     railGroup.position.set(0, firstRailY - row * UV.railPitch, railZ);
@@ -329,12 +421,13 @@ export function createDistributionBoard({
   }
 
   if (!ghost) {
-    const teMark = makeTextPlate(`${UV.te} TE  ·  3 Reihen  ·  TH35`, 90, 10, {
-      bg: "#c5c7c4",
+    const teMark = makeTextPlate(`3 × ${UV.te} TE`, 48, 9, {
+      bg: "#f4f1ea",
       fg: "#2a2c2e",
-      size: 44,
+      size: 56,
     });
-    teMark.position.set(0, -UV.outerH / 2 + 14 * MM, UV.outerD / 2 - 1 * MM);
+    teMark.position.set(0, -UV.outerH / 2 + 16 * MM, UV.outerD / 2 - 12 * MM);
+    noRay(teMark);
     root.add(teMark);
 
     root.userData = {
@@ -344,7 +437,7 @@ export function createDistributionBoard({
       id: "unterverteilung",
       catalogId: "uv-3reihen",
       name: "Unterverteilung, 3-reihig",
-      meta: `${UV.te} TE · ${UV.rows} Reihen · ${toMm(UV.outerW)} × ${toMm(UV.outerH)} × ${toMm(UV.outerD)} mm · offen`,
+      meta: `${UV.rows}×${UV.te} TE · ${toMm(UV.outerW)} × ${toMm(UV.outerH)} × ${toMm(UV.outerD)} mm · N/PE-Klemmenfeld`,
       kind: "distributionBoard",
       mountSlots: rows.map((r) => r.userData),
     };
