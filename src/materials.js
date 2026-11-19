@@ -102,6 +102,40 @@ export const materials = {
     metalness: 0.1,
     roughness: 0.5,
   }),
+  /** Greif-Iso Schelle lichtgrau (RAL-ähnlich) */
+  clampPlastic: new THREE.MeshStandardMaterial({
+    color: 0xc8cbce,
+    metalness: 0.05,
+    roughness: 0.55,
+  }),
+  lever: new THREE.MeshStandardMaterial({
+    color: 0x3a3c40,
+    metalness: 0.15,
+    roughness: 0.4,
+  }),
+  apWhite: new THREE.MeshStandardMaterial({
+    color: 0xf0eee8,
+    metalness: 0.02,
+    roughness: 0.55,
+  }),
+  apIvory: new THREE.MeshStandardMaterial({
+    color: 0xe8e4d8,
+    metalness: 0.02,
+    roughness: 0.5,
+  }),
+  cable: new THREE.MeshStandardMaterial({
+    color: 0xb8b0a0,
+    metalness: 0.05,
+    roughness: 0.65,
+  }),
+  ghost: new THREE.MeshStandardMaterial({
+    color: 0x6eb5ff,
+    metalness: 0.05,
+    roughness: 0.4,
+    transparent: true,
+    opacity: 0.45,
+    depthWrite: false,
+  }),
 };
 
 export function cloneMaterial(mat) {

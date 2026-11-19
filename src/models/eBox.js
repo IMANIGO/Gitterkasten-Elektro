@@ -74,6 +74,8 @@ export function createEBox() {
     id: "bodenplatte",
     name: "Bodenplatte",
     meta: `Lochblech ${toMm(PANEL_INNER.floorW)} × ${toMm(PANEL_INNER.floorD)} mm`,
+    mount: "lochblech",
+    face: "floor",
   };
 
   // Frame as shallow rim on the table
@@ -100,6 +102,8 @@ export function createEBox() {
     id: "rueckwand",
     name: "Rückwand",
     meta: `Wandlochraster · ${toMm(PANEL_INNER.backW)} × ${toMm(PANEL_INNER.backH)} mm`,
+    mount: "lochblech",
+    face: "back",
   };
   const backFrame = createRectFrame(W, H, F, T, frameMat);
   backFrame.position.set(0, y0 + H / 2, 0);
@@ -155,6 +159,8 @@ function addSideWall(root, p) {
     id: `seitenwand-${p.id}`,
     name: p.name,
     meta: `Lochblech ${toMm(PANEL_INNER.sideD)} × ${toMm(PANEL_INNER.sideH)} mm · stapelbar`,
+    mount: "lochblech",
+    face: p.id === "links" ? "left" : "right",
   };
 
   // Build as XY panel then rotate so local +Z faces inward

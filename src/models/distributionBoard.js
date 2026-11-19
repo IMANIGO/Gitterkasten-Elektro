@@ -203,10 +203,20 @@ function createDuct(height) {
   return g;
 }
 
-export function createDistributionBoard() {
+/**
+ * @param {{ includeSampleTerminals?: boolean, ghost?: boolean, positioned?: boolean }} [opts]
+ * positioned=true keeps legacy UV_POSITION (demos); placeable UV leaves origin at 0.
+ */
+export function createDistributionBoard({
+  includeSampleTerminals = false,
+  ghost = false,
+  positioned = false,
+} = {}) {
   const root = new THREE.Group();
   root.name = "Unterverteilung";
-  root.position.set(UV_POSITION.x, UV_POSITION.y, UV_POSITION.z);
+  if (positioned) {
+    root.position.set(UV_POSITION.x, UV_POSITION.y, UV_POSITION.z);
+  }
 
   root.add(createHousing());
 
@@ -215,31 +225,33 @@ export function createDistributionBoard() {
   const innerBack = -UV.outerD / 2 + UV.wall + 6 * MM;
   const railZ = innerBack + UV.dinHeight / 2 + 4 * MM;
 
-  const ductH = innerH - 20 * MM;
-  const ductX = innerW / 2 - 28 * MM;
-  const leftDuct = createDuct(ductH);
-  leftDuct.position.set(-ductX, 0, innerBack + 22 * MM);
-  leftDuct.userData = {
-    pickable: true,
-    id: "kabelkanal-links",
-    name: "Verdrahtungskanal links",
-    meta: "25 × 40 mm · geschlitzt",
-  };
-  const rightDuct = createDuct(ductH);
-  rightDuct.position.set(ductX, 0, innerBack + 22 * MM);
-  rightDuct.userData = {
-    pickable: true,
-    id: "kabelkanal-rechts",
-    name: "Verdrahtungskanal rechts",
-    meta: "25 × 40 mm · geschlitzt",
-  };
-  root.add(leftDuct, rightDuct);
+  if (!ghost) {
+    const ductH = innerH - 20 * MM;
+    const ductX = innerW / 2 - 28 * MM;
+    const leftDuct = createDuct(ductH);
+    leftDuct.position.set(-ductX, 0, innerBack + 22 * MM);
+    leftDuct.userData = {
+      pickable: true,
+      id: "kabelkanal-links",
+      name: "Verdrahtungskanal links",
+      meta: "25 × 40 mm · geschlitzt",
+    };
+    const rightDuct = createDuct(ductH);
+    rightDuct.position.set(ductX, 0, innerBack + 22 * MM);
+    rightDuct.userData = {
+      pickable: true,
+      id: "kabelkanal-rechts",
+      name: "Verdrahtungskanal rechts",
+      meta: "25 × 40 mm · geschlitzt",
+    };
+    root.add(leftDuct, rightDuct);
 
-  const pe = createBusbar("pe", UV.railLength, 12);
-  pe.position.set(0, innerH / 2 - 28 * MM, innerBack + 14 * MM);
-  const nBar = createBusbar("n", UV.railLength, 12);
-  nBar.position.set(0, innerH / 2 - 52 * MM, innerBack + 14 * MM);
-  root.add(pe, nBar);
+    const pe = createBusbar("pe", UV.railLength, 12);
+    pe.position.set(0, innerH / 2 - 28 * MM, innerBack + 14 * MM);
+    const nBar = createBusbar("n", UV.railLength, 12);
+    nBar.position.set(0, innerH / 2 - 52 * MM, innerBack + 14 * MM);
+    root.add(pe, nBar);
+  }
 
   const firstRailY = innerH / 2 - 95 * MM;
   const rows = [];
@@ -251,42 +263,69 @@ export function createDistributionBoard() {
       id: `hutschiene-${row + 1}`,
       name: `Hutschiene Reihe ${row + 1}`,
       meta: `TH35-7,5 · ${UV.te} TE · ${toMm(UV.railLength)} mm · Raster 18 mm`,
+      mount: "din",
+      teCapacity: UV.te,
+      railLength: UV.railLength,
+      rowIndex: row,
     };
     const rail = createDinRail(UV.railLength);
     railGroup.add(rail);
-    const label = makeTextPlate(`Reihe ${row + 1}`, 42, 9, { bg: "#2c3034", fg: "#f2f0ea", size: 52 });
-    label.position.set(-UV.railLength / 2 + 28 * MM, 24 * MM, 12 * MM);
-    railGroup.add(label);
+    if (!ghost) {
+      const label = makeTextPlate(`Reihe ${row + 1}`, 42, 9, { bg: "#2c3034", fg: "#f2f0ea", size: 52 });
+      label.position.set(-UV.railLength / 2 + 28 * MM, 24 * MM, 12 * MM);
+      railGroup.add(label);
+    }
     railGroup.position.set(0, firstRailY - row * UV.railPitch, railZ);
     rows.push(railGroup);
     root.add(railGroup);
   }
 
-  const klemmen = new THREE.Group();
-  klemmen.name = "Reihenklemmen";
-  klemmen.userData = {
-    pickable: true,
-    id: "reihenklemmen",
-    name: "Reihenklemmen",
-    meta: "Durchgangsklemmen 2,5 mm² · N- und PE-Klemme am Reihenende",
-  };
-  const kinds = [...Array(8).fill("l"), "n", "pe"];
-  const pitch = 6.5 * MM;
-  const startX = -UV.railLength / 2 + 8 * MM;
-  kinds.forEach((kind, i) => {
-    const k = createReihenklemme(kind);
-    k.position.set(startX + i * pitch, 6 * MM, 22 * MM);
-    klemmen.add(k);
-  });
-  rows[2].add(klemmen);
+  if (includeSampleTerminals && !ghost) {
+    const klemmen = new THREE.Group();
+    klemmen.name = "Reihenklemmen";
+    klemmen.userData = {
+      pickable: true,
+      id: "reihenklemmen",
+      name: "Reihenklemmen",
+      meta: "Durchgangsklemmen 2,5 mm² · N- und PE-Klemme am Reihenende",
+    };
+    const kinds = [...Array(8).fill("l"), "n", "pe"];
+    const pitch = 6.5 * MM;
+    const startX = -UV.railLength / 2 + 8 * MM;
+    kinds.forEach((kind, i) => {
+      const k = createReihenklemme(kind);
+      k.position.set(startX + i * pitch, 6 * MM, 22 * MM);
+      klemmen.add(k);
+    });
+    rows[2].add(klemmen);
+  }
 
-  const teMark = makeTextPlate(`${UV.te} TE  ·  3 Reihen  ·  TH35`, 90, 10, {
-    bg: "#c5c7c4",
-    fg: "#2a2c2e",
-    size: 44,
-  });
-  teMark.position.set(0, -UV.outerH / 2 + 14 * MM, UV.outerD / 2 - 1 * MM);
-  root.add(teMark);
+  if (!ghost) {
+    const teMark = makeTextPlate(`${UV.te} TE  ·  3 Reihen  ·  TH35`, 90, 10, {
+      bg: "#c5c7c4",
+      fg: "#2a2c2e",
+      size: 44,
+    });
+    teMark.position.set(0, -UV.outerH / 2 + 14 * MM, UV.outerD / 2 - 1 * MM);
+    root.add(teMark);
+
+    root.userData = {
+      pickable: true,
+      id: "unterverteilung",
+      catalogId: "uv-3reihen",
+      name: "Unterverteilung, 3-reihig",
+      meta: `${UV.te} TE · ${UV.rows} Reihen · ${toMm(UV.outerW)} × ${toMm(UV.outerH)} × ${toMm(UV.outerD)} mm · offen`,
+      kind: "distributionBoard",
+      mountSlots: rows.map((r) => r.userData),
+    };
+  }
+
+  // Local attachment: back face sits against Lochblech (+local Z is open front)
+  root.userData.footprint = {
+    width: UV.outerW,
+    height: UV.outerH,
+    depth: UV.outerD,
+  };
 
   return root;
 }

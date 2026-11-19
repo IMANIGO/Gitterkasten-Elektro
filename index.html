@@ -32,16 +32,22 @@
 
       <div class="modebar" role="tablist" aria-label="Arbeitsmodus">
         <button type="button" class="active" data-mode="ansicht">Ansicht</button>
-        <button type="button" data-mode="betriebsmittel" disabled title="Folgt im nächsten Schritt">
-          Betriebsmittel
-        </button>
-        <button type="button" data-mode="verdrahtung" disabled title="Folgt im nächsten Schritt">
-          Verdrahtung
-        </button>
-        <button type="button" data-mode="aufmass" disabled title="Folgt im nächsten Schritt">
-          Aufmaß
-        </button>
+        <button type="button" data-mode="betriebsmittel">Betriebsmittel</button>
+        <button type="button" data-mode="verdrahtung">Verdrahtung</button>
+        <button type="button" data-mode="aufmass">Aufmaß</button>
       </div>
+
+      <aside class="library-panel" id="library-panel" hidden>
+        <header class="library-head">
+          <p class="kicker">Bibliothek</p>
+          <h2 id="library-title">Betriebsmittel</h2>
+          <p class="library-hint" id="library-hint">Artikel wählen, dann auf Lochblech / Hutschiene klicken</p>
+        </header>
+        <div class="library-body" id="library-body"></div>
+        <footer class="library-foot">
+          <p id="placement-feedback" class="feedback"></p>
+        </footer>
+      </aside>
 
       <aside class="hover-card" id="hover-card" hidden>
         <p class="kicker">Zeiger</p>
@@ -49,11 +55,17 @@
         <p class="meta" id="hover-meta"></p>
       </aside>
 
+      <aside class="takeoff-card" id="takeoff-card" hidden>
+        <p class="kicker">Aufmaß</p>
+        <p class="name" id="takeoff-summary"></p>
+        <ul id="takeoff-list"></ul>
+      </aside>
+
       <footer class="statusbar">
         <span>E-Box 1020 × 510 × 540 mm</span>
         <span>Lochblech · Raster 50 mm</span>
         <span>Hutschiene TH35 · TE 18 mm</span>
-        <span>N / PE Sammelschienen</span>
+        <span id="status-mode">Modus: Ansicht</span>
       </footer>
     </div>
 

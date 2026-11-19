@@ -4,6 +4,12 @@ export const state = {
   cameraPreset: "gesamt",
   hovered: null,
   mode: "ansicht",
+  selectedCatalogId: null,
+  placementFeedback: null,
+  wiringFeedback: null,
+  placedCount: 0,
+  wireCount: 0,
+  lastWireLengthMm: 0,
 };
 
 export function subscribe(fn) {
