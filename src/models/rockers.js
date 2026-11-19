@@ -1,13 +1,20 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { materials } from "../materials.js";
-import { MM, toMm } from "../units.js";
+import { MM } from "../units.js";
 import { paintSymbol } from "../catalog/symbols.js";
 
 /**
  * AP-Wippen mit Schaltzeichen (markenneutral, keine Herstellerzeichen).
- * Einzelwippe 80×80, Serie (2-fach) 151×80 — auch gemischt Taster/Schalter.
- * Zeichen: Kreis mit Stiel und Nase (Schalter), Doppelkreis (Taster).
+ * Aufputz-Dose: eine große Wippe 80×80×42, zwei Wippen nebeneinander 151×81×42.
+ * Kurzer Leitungsstutzen oben mittig, runde Einführung an der rechten Seite.
+ * Taster zusätzlich mit kleinem Querbalken in der unteren Wippenhälfte.
+ * Schaltzeichen bleibt auf der Wippe, aufrecht und parallel zur Front.
  */
+
+/** Gehäuse ohne Stutzen und Einführung. Die ragen bewusst darüber hinaus. */
+const AP_SINGLE = { w: 80, h: 80, d: 42 };
+const AP_SERIES = { w: 151, h: 81, d: 42 };
 
 export const ROCKER_SYMBOLS = [
   "aus",
@@ -59,96 +66,125 @@ function symbolMaterial(kind, bg = "#f6f3ea") {
   });
 }
 
-function addRocker(root, { kind, x, zFace, ghost }) {
-  const bodyMat = ghost
-    ? materials.ghost.clone()
-    : new THREE.MeshStandardMaterial({ color: 0xfaf8f2, roughness: 0.42, metalness: 0.04 });
-  const rocker = mesh(new THREE.BoxGeometry(30 * MM, 46 * MM, 6 * MM), bodyMat);
-  rocker.position.set(x, 0, zFace + 2 * MM);
-  rocker.rotation.x = -0.1;
+function plastic(ghost, color, roughness, metalness = 0.04) {
+  if (ghost) return materials.ghost.clone();
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness });
+}
+
+/**
+ * Kompakte Aufputz-Dose. Rückseite bei lokal z = 0, Front bei z = D.
+ * Stutzen und Einführung sitzen auf der Dose und dürfen das Katalogmaß überragen.
+ */
+function addHousing(root, { W, H, D, ghost }) {
+  const shell = plastic(ghost, 0xe4e1d8, 0.5, 0.04);
+  const radius = Math.min(7.2 * MM, D / 2 - 0.5 * MM);
+  const body = mesh(new RoundedBoxGeometry(W, H, D, 3, radius), shell);
+  body.name = "gehaeuse";
+  body.position.z = D / 2;
+  root.add(body);
+
+  const grey = plastic(ghost, 0x8d9398, 0.42, 0.16);
+  const tipMat = plastic(ghost, 0xb7bcc1, 0.36, 0.1);
+  const zEntry = D * 0.46;
+
+  const stubR = 3.6 * MM;
+  const stubVis = 20 * MM;
+  const collar = mesh(new THREE.CylinderGeometry(stubR * 1.4, stubR * 1.55, 3.4 * MM, 16), shell);
+  collar.name = "leitungsbund";
+  collar.position.set(0, H / 2 - 0.4 * MM, zEntry);
+  root.add(collar);
+  const stub = mesh(new THREE.CylinderGeometry(stubR, stubR * 1.04, stubVis + 4 * MM, 16), grey);
+  stub.name = "leitung";
+  stub.position.set(0, H / 2 + stubVis / 2 - 1.4 * MM, zEntry);
+  root.add(stub);
+  const tip = mesh(new THREE.CylinderGeometry(stubR * 0.9, stubR, 2.6 * MM, 12), tipMat);
+  tip.position.set(0, H / 2 + stubVis - 1.5 * MM, zEntry);
+  root.add(tip);
+
+  const glandR = 5.4 * MM;
+  const glandLen = 14 * MM;
+  const gland = mesh(new THREE.CylinderGeometry(glandR * 0.82, glandR, glandLen, 18), grey);
+  gland.name = "einfuehrung";
+  gland.rotation.z = Math.PI / 2;
+  gland.position.set(W / 2 + glandLen / 2 - 2.2 * MM, 0, zEntry);
+  root.add(gland);
+  const cap = mesh(new THREE.CylinderGeometry(glandR * 0.72, glandR * 0.82, 2.4 * MM, 14), tipMat);
+  cap.rotation.z = Math.PI / 2;
+  cap.position.set(W / 2 + glandLen - 2.6 * MM, 0, zEntry);
+  root.add(cap);
+
+  return D;
+}
+
+/**
+ * Eine große Wippe. Taster und Taster mit Leuchte tragen den Querbalken
+ * in der unteren Hälfte. Schaltzeichen bleibt flach auf der Wippe, ohne
+ * zusätzliche Drehung, damit es aufrecht lesbar bleibt.
+ */
+function addRocker(root, { kind, x, w, h, zFront, ghost }) {
+  const bodyMat = plastic(ghost, 0xfbfaf6, 0.36, 0.03);
+  const gapMat = plastic(ghost, 0xb7b2a8, 0.62, 0.02);
+  const depth = 4.8 * MM;
+  const proud = 2.6 * MM;
+
+  const gap = mesh(new RoundedBoxGeometry(w + 3.2 * MM, h + 3.2 * MM, 1.2 * MM, 2, 1.2 * MM), gapMat);
+  gap.position.set(x, 0, zFront + 0.7 * MM);
+  root.add(gap);
+
+  const rocker = mesh(new RoundedBoxGeometry(w, h, depth, 2, 2.2 * MM), bodyMat);
+  rocker.name = "wippe";
+  const rockerZ = zFront + proud - depth / 2;
+  rocker.position.set(x, 0, rockerZ);
   root.add(rocker);
-  const seam = mesh(new THREE.BoxGeometry(30 * MM, 1.1 * MM, 1 * MM), materials.plasticBlack);
-  seam.position.set(x, 0, zFace + 4.6 * MM);
-  root.add(seam);
+  const faceZ = rockerZ + depth / 2;
+
+  if (kind === "taster" || kind === "taster-licht") {
+    const barMat = plastic(ghost, 0x3e4449, 0.42, 0.08);
+    const bar = mesh(new THREE.CapsuleGeometry(1.55 * MM, 20 * MM, 4, 12), barMat);
+    bar.name = "tastermarke";
+    bar.rotation.z = Math.PI / 2;
+    bar.position.set(x, -h * 0.22, faceZ + 0.85 * MM);
+    root.add(bar);
+  }
+
   if (!ghost) {
-    const plate = mesh(new THREE.PlaneGeometry(22 * MM, 22 * MM), symbolMaterial(kind));
-    plate.position.set(x, 2 * MM, zFace + 5.2 * MM);
-    plate.rotation.x = -0.1;
+    const plateSize = Math.min(17 * MM, w * 0.3, h * 0.3);
+    const plate = mesh(new THREE.PlaneGeometry(plateSize, plateSize), symbolMaterial(kind, "#fbfaf6"));
+    plate.name = "schaltzeichen";
+    plate.position.set(x, h * 0.06, faceZ + 0.35 * MM);
+    plate.material.polygonOffset = true;
+    plate.material.polygonOffsetFactor = -2;
+    plate.material.polygonOffsetUnits = -2;
     root.add(plate);
   }
 }
 
+function rockerSlots(W, H, count) {
+  const margin = 6 * MM;
+  const h = H - margin * 2;
+  if (count <= 1) return [{ x: 0, w: W - margin * 2, h }];
+  const gap = 4.4 * MM;
+  const w = (W - margin * 2 - gap) / 2;
+  const x = w / 2 + gap / 2;
+  return [
+    { x: -x, w, h },
+    { x, w, h },
+  ];
+}
+
 /**
- * Zwei große Wippen in einem Aufputz-Kombinationsrahmen.
- * Form einer üblichen 2-fach-Abdeckung, ohne Herstellerzeichen.
+ * Dieselbe Aufputz-Dose, breiter, mit zwei großen Wippen nebeneinander.
  */
 function buildSeriesFrame(root, { kinds, ghost }) {
-  const W = 151 * MM;
-  const H = 81 * MM;
-  const D = 40 * MM;
-  const shell = ghost
-    ? materials.ghost.clone()
-    : new THREE.MeshStandardMaterial({ color: 0xf3f1ea, roughness: 0.46, metalness: 0.03 });
-  const wellMat = ghost
-    ? materials.ghost.clone()
-    : new THREE.MeshStandardMaterial({ color: 0xd9d6cc, roughness: 0.6, metalness: 0.02 });
-  const rockerMat = ghost
-    ? materials.ghost.clone()
-    : new THREE.MeshStandardMaterial({ color: 0xfbfaf6, roughness: 0.36, metalness: 0.03 });
-
-  const body = mesh(new THREE.BoxGeometry(W * 0.96, H * 0.9, D * 0.72), shell);
-  body.position.z = (D * 0.72) / 2;
-  root.add(body);
-
-  const bezel = mesh(new THREE.BoxGeometry(W, H, 3.2 * MM), shell);
-  const bezelZ = D * 0.72 + 1.6 * MM;
-  bezel.position.z = bezelZ;
-  root.add(bezel);
-
-  const rockerW = 64 * MM;
-  const rockerH = 66 * MM;
-  const centers = [-36 * MM, 36 * MM];
-  const zWell = bezelZ + 1.2 * MM;
-
-  centers.forEach((x, i) => {
-    const well = mesh(new THREE.BoxGeometry(rockerW + 2.4 * MM, rockerH + 2.2 * MM, 1.4 * MM), wellMat);
-    well.position.set(x, 0, zWell);
-    root.add(well);
-
-    const rocker = mesh(new THREE.BoxGeometry(rockerW, rockerH, 5 * MM), rockerMat);
-    rocker.position.set(x, 0.4 * MM, zWell + 2.6 * MM);
-    rocker.rotation.x = -0.05;
-    root.add(rocker);
-
-    const groove = mesh(
-      new THREE.BoxGeometry(rockerW * 0.9, 0.6 * MM, 0.7 * MM),
-      ghost ? rockerMat : new THREE.MeshStandardMaterial({ color: 0xc9c5bb, roughness: 0.55 }),
-    );
-    groove.position.set(x, 0, zWell + 4.6 * MM);
-    groove.rotation.x = -0.05;
-    root.add(groove);
-
-    if (!ghost) {
-      const plate = mesh(new THREE.PlaneGeometry(20 * MM, 20 * MM), symbolMaterial(kinds[i], "#fbfaf6"));
-      plate.position.set(x, 2 * MM, zWell + 5.2 * MM);
-      plate.rotation.x = -0.05;
-      root.add(plate);
-    }
+  const W = AP_SERIES.w * MM;
+  const H = AP_SERIES.h * MM;
+  const D = AP_SERIES.d * MM;
+  const zFront = addHousing(root, { W, H, D, ghost });
+  const slots = rockerSlots(W, H, 2);
+  kinds.forEach((kind, i) => {
+    const slot = slots[i] || slots[slots.length - 1];
+    addRocker(root, { kind, x: slot.x, w: slot.w, h: slot.h, zFront, ghost });
   });
-
-  const bridge = mesh(new THREE.BoxGeometry(5 * MM, H - 8 * MM, 2.2 * MM), shell);
-  bridge.position.set(0, 0, bezelZ + 1.4 * MM);
-  root.add(bridge);
-
-  const screwMat = ghost ? shell : materials.screw;
-  for (const sx of [-1, 1]) {
-    for (const sy of [-1, 1]) {
-      const screw = mesh(new THREE.CylinderGeometry(1.7 * MM, 1.7 * MM, 1.1 * MM, 12), screwMat);
-      screw.rotation.x = Math.PI / 2;
-      screw.position.set(sx * (W / 2 - 6 * MM), sy * (H / 2 - 6 * MM), bezelZ + 1.8 * MM);
-      root.add(screw);
-    }
-  }
 }
 
 /**
@@ -159,9 +195,10 @@ export function createRockerDevice({ id, name, meta, rockers, ghost = false } = 
     ROCKER_SYMBOLS.includes(k) ? k : "wechsel",
   );
   const gangs = kinds.length;
-  const W = (gangs > 1 ? 151 : 80) * MM;
-  const H = (gangs > 1 ? 81 : 80) * MM;
-  const D = (gangs > 1 ? 40 : 42) * MM;
+  const spec = gangs > 1 ? AP_SERIES : AP_SINGLE;
+  const W = spec.w * MM;
+  const H = spec.h * MM;
+  const D = spec.d * MM;
 
   const root = new THREE.Group();
   root.name = name;
@@ -169,18 +206,9 @@ export function createRockerDevice({ id, name, meta, rockers, ghost = false } = 
   if (gangs > 1) {
     buildSeriesFrame(root, { kinds, ghost });
   } else {
-    const mat = ghost ? materials.ghost.clone() : materials.apWhite;
-    const coverMat = ghost
-      ? materials.ghost.clone()
-      : new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.48, metalness: 0.03 });
-    const body = mesh(new THREE.BoxGeometry(W * 0.94, H * 0.92, D * 0.65), mat);
-    body.position.z = (D * 0.65) / 2;
-    root.add(body);
-    const cover = mesh(new THREE.BoxGeometry(W, H, D * 0.22), coverMat);
-    cover.position.z = D * 0.65 + (D * 0.22) / 2;
-    root.add(cover);
-    const zFace = D * 0.65 + D * 0.22 + 2 * MM;
-    addRocker(root, { kind: kinds[0], x: 0, zFace, ghost });
+    const zFront = addHousing(root, { W, H, D, ghost });
+    const slot = rockerSlots(W, H, 1)[0];
+    addRocker(root, { kind: kinds[0], x: slot.x, w: slot.w, h: slot.h, zFront, ghost });
   }
 
   if (!ghost) {
@@ -193,9 +221,9 @@ export function createRockerDevice({ id, name, meta, rockers, ghost = false } = 
       meta,
       kind: "surfaceDevice",
       rockers: kinds,
-      widthMm: toMm(W),
-      heightMm: gangs > 1 ? 81 : 80,
-      depthMm: gangs > 1 ? 40 : 42,
+      widthMm: spec.w,
+      heightMm: spec.h,
+      depthMm: spec.d,
     };
   }
   return root;
@@ -308,7 +336,7 @@ export function createSeries(id, name, rockers, opts = {}) {
   return createRockerDevice({
     id,
     name,
-    meta: `151 × 81 × 40 mm · Aufputz-Kombination · ${label}`,
+    meta: `151 × 81 × 42 mm · Aufputz-Kombination · ${label}`,
     rockers,
     ...opts,
   });
