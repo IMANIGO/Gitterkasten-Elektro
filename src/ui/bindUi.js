@@ -6,6 +6,7 @@ import {
   itemDepthM,
 } from "../catalog/index.js";
 import { rankCatalogItems } from "../catalog/search.js";
+import { catalogThumbUrl } from "../catalog/thumbnails.js";
 import * as THREE from "three";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
 import {
@@ -474,12 +475,16 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     cableCircuit?.addEventListener(evt, updateCablePreview);
   });
 
+  let libraryView = "list";
+  const libraryViewBar = document.getElementById("library-view");
+
   function renderLibrary() {
     const catalog = getCatalog();
     const query = libraryQuery?.value || "";
     const ranked = rankCatalogItems(catalog.items, query);
     const scoreOf = new Map(ranked.map((entry) => [entry.item.id, entry.score]));
     const searching = query.trim().length > 0;
+    libraryBody.classList.toggle("tiles", libraryView === "tiles");
     libraryBody.innerHTML = "";
     if (searching && !ranked.length) {
       const empty = document.createElement("p");
@@ -505,10 +510,26 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
         btn.className = "catalog-item";
         btn.dataset.catalogId = item.id;
         btn.disabled = !item.placeable;
-        btn.title = item.description || "";
-        btn.innerHTML = `<span class="item-label">${item.label}</span><span class="item-dims">${formatItemDims(item)}${
-          item.placeable ? "" : " · folgt"
-        }</span>`;
+        btn.title = libraryView === "tiles" ? "" : item.description || "";
+        const thumb = document.createElement("img");
+        thumb.className = "item-thumb";
+        thumb.alt = "";
+        const copy = document.createElement("span");
+        copy.className = "item-copy";
+        const label = document.createElement("span");
+        label.className = "item-label";
+        label.textContent = item.label;
+        const dims = document.createElement("span");
+        dims.className = "item-dims";
+        dims.textContent = `${formatItemDims(item)}${item.placeable ? "" : " · folgt"}`;
+        const desc = document.createElement("span");
+        desc.className = "item-desc";
+        desc.textContent = item.description || "";
+        copy.append(label, dims, desc);
+        btn.append(thumb, copy);
+        catalogThumbUrl(item).then((url) => {
+          if (url && thumb.isConnected) thumb.src = url;
+        });
         btn.addEventListener("click", () => {
           if (!item.placeable) return;
           // Replace at current position immediately
@@ -750,6 +771,15 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
 
   fillCableSelects();
   renderLibrary();
+  libraryViewBar?.querySelectorAll("[data-library-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      libraryView = button.dataset.libraryView || "list";
+      libraryViewBar.querySelectorAll("[data-library-view]").forEach((entry) => {
+        entry.classList.toggle("active", entry === button);
+      });
+      renderLibrary();
+    });
+  });
   libraryQuery?.addEventListener("input", () => renderLibrary());
   libraryQuery?.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -864,6 +894,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     }
 
     if (librarySearch) librarySearch.hidden = next.mode !== "betriebsmittel";
+    if (libraryViewBar) libraryViewBar.hidden = next.mode !== "betriebsmittel";
     if (measurePlace) {
       measurePlace.hidden = !(
         next.mode === "betriebsmittel" &&
