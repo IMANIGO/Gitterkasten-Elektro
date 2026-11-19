@@ -35,9 +35,6 @@ function sheetPlane(width, height, baseMat, widthM, heightM) {
   mat.map = baseMat.map.clone();
   mat.map.repeat.set(rx, ry);
   mat.map.needsUpdate = true;
-  mat.alphaMap = baseMat.alphaMap.clone();
-  mat.alphaMap.repeat.set(rx, ry);
-  mat.alphaMap.needsUpdate = true;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;

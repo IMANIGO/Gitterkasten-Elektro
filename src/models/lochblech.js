@@ -2,8 +2,9 @@ import * as THREE from "three";
 import { MM } from "../units.js";
 
 /**
- * Procedural Lochblech (vertical oblong slots) matching the E-Box / Wandlochrasterplatte look.
- * Slot geometry approx. 5×16 mm on a ~12.5 × 25 mm pitch; alpha for see-through density.
+ * Procedural Lochblech matching E-Box / Wandlochrasterplatte:
+ * light galvanized sheet with dense vertical oblong slots.
+ * Painted slots (opaque) so the plate reads light-grey like the product photos.
  */
 export function createLochblechMaps({
   slotW = 5,
@@ -12,7 +13,8 @@ export function createLochblechMaps({
   pitchY = 25,
   cellsX = 16,
   cellsY = 8,
-  metal = "#b8bdc2",
+  metal = "#cfd3d7",
+  slot = "#5c6268",
 } = {}) {
   const pxPerMm = 4;
   const w = Math.round(cellsX * pitchX * pxPerMm);
@@ -25,13 +27,13 @@ export function createLochblechMaps({
   ctx.fillStyle = metal;
   ctx.fillRect(0, 0, w, h);
 
-  const alpha = document.createElement("canvas");
-  alpha.width = w;
-  alpha.height = h;
-  const actx = alpha.getContext("2d");
-  actx.fillStyle = "#ffffff";
-  actx.fillRect(0, 0, w, h);
-  actx.fillStyle = "#000000";
+  // Soft panel sheen
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "rgba(255,255,255,0.12)");
+  grad.addColorStop(0.5, "rgba(255,255,255,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.08)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
 
   const sw = slotW * pxPerMm;
   const sh = slotH * pxPerMm;
@@ -41,20 +43,10 @@ export function createLochblechMaps({
     for (let ix = 0; ix < cellsX; ix++) {
       const cx = (ix + 0.5) * pitchX * pxPerMm;
       const cy = (iy + 0.5) * pitchY * pxPerMm;
-      roundRect(ctx, cx - sw / 2, cy - sh / 2, sw, sh, rx, "#1a1c1e");
-      roundRect(actx, cx - sw / 2, cy - sh / 2, sw, sh, rx, "#000000");
+      roundRect(ctx, cx - sw / 2, cy - sh / 2, sw, sh, rx, slot);
+      // inner highlight edge on slots
+      roundRect(ctx, cx - sw / 2 + 1, cy - sh / 2 + 1, sw - 2, 2, 1, "rgba(255,255,255,0.18)");
     }
-  }
-
-  // Subtle horizontal highlight bands for sheet thickness feel
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 1;
-  for (let iy = 0; iy <= cellsY; iy++) {
-    const y = iy * pitchY * pxPerMm;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
-    ctx.stroke();
   }
 
   const map = new THREE.CanvasTexture(canvas);
@@ -62,11 +54,7 @@ export function createLochblechMaps({
   map.anisotropy = 8;
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
 
-  const alphaMap = new THREE.CanvasTexture(alpha);
-  alphaMap.anisotropy = 8;
-  alphaMap.wrapS = alphaMap.wrapT = THREE.RepeatWrapping;
-
-  return { map, alphaMap, pitchX: pitchX * MM, pitchY: pitchY * MM };
+  return { map, pitchX: pitchX * MM, pitchY: pitchY * MM };
 }
 
 function roundRect(ctx, x, y, w, h, r, fill) {
@@ -85,16 +73,12 @@ function roundRect(ctx, x, y, w, h, r, fill) {
   ctx.fill();
 }
 
-export function createLochblechMaterial(maps, { transparent = true } = {}) {
+export function createLochblechMaterial(maps) {
   return new THREE.MeshStandardMaterial({
     map: maps.map,
-    alphaMap: maps.alphaMap,
     color: 0xffffff,
-    metalness: 0.72,
-    roughness: 0.38,
-    transparent,
-    alphaTest: transparent ? 0.35 : 0,
+    metalness: 0.42,
+    roughness: 0.48,
     side: THREE.DoubleSide,
-    depthWrite: true,
   });
 }

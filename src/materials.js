@@ -8,14 +8,14 @@ export const materials = {
   }),
   /** E-Box frame — light industrial grey (near RAL 9006 / galvanized). */
   eboxFrame: new THREE.MeshStandardMaterial({
-    color: 0xa8adb3,
-    metalness: 0.78,
-    roughness: 0.36,
+    color: 0xc4c8cd,
+    metalness: 0.55,
+    roughness: 0.42,
   }),
   frame: new THREE.MeshStandardMaterial({
-    color: 0x5c6166,
-    metalness: 0.7,
-    roughness: 0.4,
+    color: 0x7a8086,
+    metalness: 0.55,
+    roughness: 0.45,
   }),
   wire: new THREE.MeshStandardMaterial({
     color: 0x9aa2aa,
