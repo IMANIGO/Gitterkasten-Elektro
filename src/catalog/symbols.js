@@ -1,38 +1,54 @@
 /**
  * Installations-Schaltzeichen, nachgezeichnet (nicht als Bild übernommen).
- * Quelle der Formen: Schaltzeichen „Schalter für Installation“, „Bauteile“,
- * „Verbinder“ — Kreis mit Stiel und Nase für Schalter, Doppelkreis für Taster.
- * Koordinaten im Quadrat 0…100.
+ * Quelle: Tabelle „Schalter für Installation“.
+ * Koordinaten im Quadrat 0…100, Y nach unten.
+ * Kreis sitzt unten, der Stiel steigt nach rechts (60° zur Waagrechten).
+ * Die Nase ist ein kurzer Strich an der Spitze nach unten rechts —
+ * sie ersetzt den Stiel nicht. Haken an Serie, Kreuz und Wechsel zeigen
+ * flach nach außen.
  */
 
-function nose(x1, y1, x2, y2, count) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
-  const px = -uy;
-  const py = ux;
-  const ops = [];
-  for (let i = 0; i < count; i++) {
-    const along = len - 4 - i * 11;
-    const bx = x1 + ux * along;
-    const by = y1 + uy * along;
-    ops.push({ op: "line", x1: bx, y1: by, x2: bx + px * 14, y2: by + py * 14 });
+const UX = 0.5;
+const UY = -Math.sqrt(3) / 2;
+/** Nase und Außenhaken: kurz, flach nach außen (etwa 18° zur Waagrechten). */
+const NOSE_ANG = (18 * Math.PI) / 180;
+const NX = Math.cos(NOSE_ANG);
+const NY = Math.sin(NOSE_ANG);
+
+function r1(v) {
+  return Math.round(v * 10) / 10;
+}
+
+function line(x1, y1, x2, y2) {
+  return { op: "line", x1: r1(x1), y1: r1(y1), x2: r1(x2), y2: r1(y2) };
+}
+
+function circle(x, y, rad, fill = false) {
+  const op = { op: "circle", x: r1(x), y: r1(y), r: r1(rad) };
+  if (fill) op.fill = true;
+  return op;
+}
+
+/** Kreis + Stiel nach oben rechts, optional Nasen an der Spitze. */
+function switchStem(noses, { cx = 38, cy = 64, rad = 15, reach = 34, nose = 10, step = 11 } = {}) {
+  const tipX = cx + UX * (rad + reach);
+  const tipY = cy + UY * (rad + reach);
+  const ops = [circle(cx, cy, rad), line(cx + UX * rad, cy + UY * rad, tipX, tipY)];
+  for (let i = 0; i < noses; i++) {
+    const bx = tipX - UX * step * i;
+    const by = tipY - UY * step * i;
+    ops.push(line(bx, by, bx + NX * nose, by + NY * nose));
   }
   return ops;
 }
 
-function switchStem(noses) {
-  const x1 = 46;
-  const y1 = 54;
-  const x2 = 84;
-  const y2 = 16;
-  return [
-    { op: "circle", x: 34, y: 66, r: 16 },
-    { op: "line", x1, y1, x2, y2 },
-    ...nose(x1, y1, x2, y2, noses),
-  ];
+function armTip(cx, cy, dirX, dirY, dist) {
+  return [cx + dirX * dist, cy + dirY * dist];
+}
+
+/** Kurzer Außenhaken an einer Armspitze. */
+function endHook(tipX, tipY, hx, hy, len) {
+  return line(tipX, tipY, tipX + hx * len, tipY + hy * len);
 }
 
 /** @returns {{op:string, [key:string]: any}[]} */
@@ -40,65 +56,87 @@ export function symbolOps(kind) {
   if (kind === "aus") return switchStem(1);
   if (kind === "aus2") return switchStem(2);
   if (kind === "dimmer") {
-    const stem = switchStem(1);
-    const x1 = 46;
-    const y1 = 54;
-    const x2 = 84;
-    const y2 = 16;
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const len = Math.hypot(dx, dy) || 1;
-    const px = -dy / len;
-    const py = dx / len;
-    stem.push({
-      op: "line",
-      x1: mx - px * 9,
-      y1: my - py * 9,
-      x2: mx + px * 9,
-      y2: my + py * 9,
-    });
-    return stem;
+    const cx = 38;
+    const cy = 64;
+    const rad = 15;
+    const reach = 34;
+    const ops = switchStem(0, { cx, cy, rad, reach });
+    const along = rad + reach * 0.93;
+    const mx = cx + UX * along;
+    const my = cy + UY * along;
+    const slash = (12 * Math.PI) / 180;
+    const left = 12;
+    const right = 17;
+    const cs = Math.cos(slash);
+    const sn = Math.sin(slash);
+    ops.push(line(mx - cs * left, my + sn * left, mx + cs * right, my - sn * right));
+    return ops;
   }
   if (kind === "wechsel") {
-    const x1 = 48;
-    const y1 = 50;
-    const x2 = 84;
-    const y2 = 16;
+    const cx = 48;
+    const cy = 50;
+    const rad = 13;
+    const reach = 24;
+    const nose = 11;
+    const dist = rad + reach;
+    const [ux, uy] = armTip(cx, cy, UX, UY, dist);
+    const [lx, ly] = armTip(cx, cy, -UX, -UY, dist);
     return [
-      { op: "circle", x: 36, y: 58, r: 14 },
-      { op: "line", x1, y1, x2, y2 },
-      ...nose(x1, y1, x2, y2, 1),
-      { op: "line", x1: 46, y1: 68, x2: 86, y2: 90 },
+      circle(cx, cy, rad),
+      line(cx + UX * rad, cy + UY * rad, ux, uy),
+      endHook(ux, uy, NX, NY, nose),
+      line(cx - UX * rad, cy - UY * rad, lx, ly),
+      endHook(lx, ly, -NX, -NY, nose),
     ];
   }
   if (kind === "kreuz") {
+    const cx = 50;
+    const cy = 50;
+    const rad = 12;
+    const dist = rad + 22;
+    const hook = 11;
+    const ur = armTip(cx, cy, UX, UY, dist);
+    const dl = armTip(cx, cy, -UX, -UY, dist);
+    const ul = armTip(cx, cy, -UX, UY, dist);
+    const dr = armTip(cx, cy, UX, -UY, dist);
     return [
-      { op: "line", x1: 16, y1: 16, x2: 84, y2: 84 },
-      { op: "line", x1: 84, y1: 16, x2: 16, y2: 84 },
-      { op: "circle", x: 50, y: 50, r: 13, fill: true },
+      line(ul[0], ul[1], dr[0], dr[1]),
+      line(ur[0], ur[1], dl[0], dl[1]),
+      endHook(ul[0], ul[1], -NX, NY, hook),
+      endHook(ur[0], ur[1], NX, NY, hook),
+      endHook(dl[0], dl[1], -NX, -NY, hook),
+      endHook(dr[0], dr[1], NX, -NY, hook),
+      circle(cx, cy, rad, true),
     ];
   }
   if (kind === "serieV") {
+    const cx = 50;
+    const cy = 68;
+    const rad = 14;
+    const dist = rad + 22;
+    const hook = 12;
+    const vx = Math.cos((50 * Math.PI) / 180);
+    const vy = -Math.sin((50 * Math.PI) / 180);
+    const left = armTip(cx, cy, -vx, vy, dist);
+    const right = armTip(cx, cy, vx, vy, dist);
     return [
-      { op: "circle", x: 50, y: 70, r: 16 },
-      { op: "line", x1: 42, y1: 56, x2: 20, y2: 16 },
-      { op: "line", x1: 58, y1: 56, x2: 80, y2: 16 },
+      circle(cx, cy, rad),
+      line(cx - vx * rad, cy + vy * rad, left[0], left[1]),
+      line(cx + vx * rad, cy + vy * rad, right[0], right[1]),
+      endHook(left[0], left[1], -NX, NY, hook),
+      endHook(right[0], right[1], NX, NY, hook),
     ];
   }
   if (kind === "taster") {
-    return [
-      { op: "circle", x: 50, y: 50, r: 28 },
-      { op: "circle", x: 50, y: 50, r: 14 },
-    ];
+    return [circle(50, 50, 27), circle(50, 50, 16)];
   }
   if (kind === "taster-licht" || kind === "lampe") {
-    const r = kind === "lampe" ? 24 : 28;
+    const rad = kind === "lampe" ? 24 : 26;
+    const o = rad / Math.SQRT2;
     return [
-      { op: "circle", x: 50, y: 50, r },
-      { op: "line", x1: 50 - r * 0.62, y1: 50 - r * 0.62, x2: 50 + r * 0.62, y2: 50 + r * 0.62 },
-      { op: "line", x1: 50 + r * 0.62, y1: 50 - r * 0.62, x2: 50 - r * 0.62, y2: 50 + r * 0.62 },
+      circle(50, 50, rad),
+      line(50 - o, 50 - o, 50 + o, 50 + o),
+      line(50 + o, 50 - o, 50 - o, 50 + o),
     ];
   }
   if (kind === "schuetz") {
@@ -119,15 +157,14 @@ export function symbolOps(kind) {
   }
   if (kind === "stromstoss") {
     return [
-      { op: "rect", x: 14, y: 26, w: 72, h: 48 },
+      { op: "rect", x: 8, y: 34, w: 84, h: 30 },
       {
         op: "polyline",
         pts: [
-          [26, 58],
-          [26, 40],
-          [50, 40],
-          [50, 58],
-          [74, 58],
+          [20, 54],
+          [44, 54],
+          [44, 44],
+          [76, 44],
         ],
       },
     ];
@@ -135,16 +172,24 @@ export function symbolOps(kind) {
   if (kind === "daemmerung") {
     return [
       { op: "rect", x: 16, y: 16, w: 68, h: 68 },
-      { op: "text", x: 50, y: 42, text: "LX", size: 22 },
-      { op: "line", x1: 30, y1: 64, x2: 62, y2: 64 },
+      { op: "text", x: 34, y: 38, text: "LX", size: 16 },
       {
         op: "polyline",
         pts: [
-          [54, 56],
-          [68, 64],
-          [54, 72],
+          [58, 33],
+          [50, 39],
+          [58, 45],
         ],
       },
+      {
+        op: "polyline",
+        pts: [
+          [26, 68],
+          [44, 68],
+          [62, 58],
+        ],
+      },
+      { op: "line", x1: 66, y1: 68, x2: 76, y2: 68 },
     ];
   }
   if (kind === "dose") {
