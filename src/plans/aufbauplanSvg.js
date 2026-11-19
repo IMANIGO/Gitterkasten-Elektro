@@ -75,10 +75,28 @@ export function renderAufbauplanSvg(plan) {
     </g>`;
   }
 
-  let legend = "";
-  (plan.legend || []).forEach((l, i) => {
-    const y = oy + i * 15;
-    legend += `<text x="${totalW + 150}" y="${y}" text-anchor="end" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#333"><tspan font-weight="600">${escapeXml(l.tag)}</tspan>  ${escapeXml(l.label)}</text>`;
+  const legendItems = plan.legend?.length
+    ? plan.legend
+    : (plan.placements || []).map((p) => ({
+        tag: p.tag,
+        label: p.catalogId,
+        catalogId: p.catalogId,
+        symbol: symbolForCatalog(p.catalogId),
+      }));
+  const legendX = totalW + 20;
+  const legendW = 280;
+  const rowH = 22;
+  const legendTop = oy;
+  const legendH = Math.max(48, 28 + legendItems.length * rowH);
+  let legend = `<rect x="${legendX}" y="${legendTop - 8}" width="${legendW}" height="${legendH}" fill="#faf8f4" stroke="#222" stroke-width="1"/>
+    <text x="${legendX + 12}" y="${legendTop + 10}" font-size="11" font-weight="600" fill="#666" font-family="IBM Plex Sans, sans-serif">LEGENDE${plan.live ? " · live" : ""}</text>`;
+  if (!legendItems.length) {
+    legend += `<text x="${legendX + 12}" y="${legendTop + 32}" font-size="11" fill="#999" font-family="IBM Plex Sans, sans-serif">folgt dem 3D-Aufbau</text>`;
+  }
+  legendItems.forEach((l, i) => {
+    const y = legendTop + 28 + i * rowH;
+    legend += legendGlyph(l.symbol || symbolForCatalog(l.catalogId), legendX + 16, y - 4);
+    legend += `<text x="${legendX + 36}" y="${y}" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#222"><tspan font-weight="600">${escapeXml(l.tag)}</tspan>  ${escapeXml(l.label)}</text>`;
   });
 
   // UV interior block
@@ -127,22 +145,68 @@ export function renderAufbauplanSvg(plan) {
       ? `<text x="${ox + leftW + backW / 2}" y="${oy + wallH / 2}" text-anchor="middle" font-size="13" fill="#999" font-family="IBM Plex Sans, sans-serif">Noch keine Bauteile platziert — Aufbau in der 3D-Ansicht erzeugen</text>`
       : "";
 
-  const viewH = Math.max(totalH, uvY + 40);
+  const viewH = Math.max(totalH, uvY + 40, legendTop + legendH + 48);
+  const viewW = legendX + legendW + 16;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW + 160} ${viewH}" width="100%" role="img" aria-label="${escapeXml(plan.title)}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewW} ${viewH}" width="100%" role="img" aria-label="${escapeXml(plan.title)}">
     <rect width="100%" height="100%" fill="#fff"/>
     <text x="${ox}" y="28" font-size="18" font-weight="600" font-family="IBM Plex Sans, sans-serif">${escapeXml(plan.title)}</text>
     <text x="${ox}" y="46" font-size="11" fill="#666" font-family="IBM Plex Sans, sans-serif">${escapeXml(plan.modul || "")} · ${escapeXml(plan.planNr || "")} · Blatt ${escapeXml(plan.blatt || "01")}</text>
     ${panelRects}
     ${emptyHint}
     ${devices}
-    <text x="${totalW + 150}" y="${oy - 12}" text-anchor="end" font-size="11" font-weight="600" fill="#666" font-family="IBM Plex Sans, sans-serif">LEGENDE</text>
     ${legend}
     ${uvBlock}
     ${wireBlock}
     ${liveBadge}
     <text x="${ox}" y="${viewH - 16}" font-size="10" fill="#888" font-family="IBM Plex Sans, sans-serif">Maße in cm (von Bezugskante) · Abwicklung Flächen 1–4 · digital erzeugt (markenneutral)</text>
   </svg>`;
+}
+
+function symbolForCatalog(id) {
+  if (!id) return "generic";
+  if (id.includes("taster") && !id.includes("wechsel") && !id.includes("kreuz") && !id.includes("aus")) return "taster";
+  if (id.startsWith("serie")) return "serie";
+  if (id.includes("kreuz")) return "kreuz";
+  if (id.includes("wechsel") || id === "schalter") return "wechsel";
+  if (id.includes("aus")) return "aus";
+  if (id.includes("steck") || id.startsWith("cee")) return "steck";
+  if (id.startsWith("uv")) return "uv";
+  if (id.startsWith("leuchte")) return "licht";
+  return "generic";
+}
+
+function legendGlyph(symbol, x, y) {
+  const s = 12;
+  if (symbol === "taster") {
+    return `<circle cx="${x}" cy="${y - 2}" r="5" fill="none" stroke="#111" stroke-width="1.2"/>
+      <line x1="${x}" y1="${y - 7}" x2="${x}" y2="${y - 12}" stroke="#111" stroke-width="1.2"/>`;
+  }
+  if (symbol === "kreuz") {
+    return `<line x1="${x - 5}" y1="${y - 8}" x2="${x + 5}" y2="${y + 2}" stroke="#111" stroke-width="1.3"/>
+      <line x1="${x + 5}" y1="${y - 8}" x2="${x - 5}" y2="${y + 2}" stroke="#111" stroke-width="1.3"/>`;
+  }
+  if (symbol === "wechsel") {
+    return `<polyline points="${x - 6},${y} ${x - 1},${y} ${x + 6},${y - 8}" fill="none" stroke="#111" stroke-width="1.2"/>
+      <circle cx="${x + 6}" cy="${y - 8}" r="1.6" fill="#111"/>`;
+  }
+  if (symbol === "aus") {
+    return `<polyline points="${x - 6},${y + 2} ${x},${y + 2} ${x + 6},${y - 8}" fill="none" stroke="#111" stroke-width="1.2"/>`;
+  }
+  if (symbol === "serie") {
+    return `<rect x="${x - 7}" y="${y - 8}" width="${s}" height="10" fill="none" stroke="#111" stroke-width="1"/>
+      <line x1="${x - 1}" y1="${y - 8}" x2="${x - 1}" y2="${y + 2}" stroke="#111" stroke-width="1"/>`;
+  }
+  if (symbol === "steck") {
+    return `<circle cx="${x}" cy="${y - 2}" r="5" fill="none" stroke="#111" stroke-width="1.2"/>`;
+  }
+  if (symbol === "uv") {
+    return `<rect x="${x - 6}" y="${y - 8}" width="12" height="10" fill="#d8dce0" stroke="#111" stroke-width="1"/>`;
+  }
+  if (symbol === "licht") {
+    return `<circle cx="${x}" cy="${y - 2}" r="5" fill="#f5f0c8" stroke="#111" stroke-width="1"/>`;
+  }
+  return `<rect x="${x - 4}" y="${y - 6}" width="8" height="8" fill="none" stroke="#111" stroke-width="1"/>`;
 }
 
 function escapeXml(s) {

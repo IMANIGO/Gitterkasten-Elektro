@@ -6,10 +6,13 @@ import {
 import { setState, state, subscribe } from "../state.js";
 import {
   CABLE_TYPES,
+  CIRCUIT_KINDS,
+  CORE_COLOR_OPTIONS,
   CORE_COUNTS,
   CROSS_SECTIONS_MM2,
   coreColorsFor,
   formatCableSpec,
+  isSingleCoreType,
   normalizeCableSpec,
 } from "../wiring/cableTypes.js";
 
@@ -33,6 +36,10 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const cableType = document.getElementById("cable-type");
   const cableMm2 = document.getElementById("cable-mm2");
   const cableCores = document.getElementById("cable-cores");
+  const cableColor = document.getElementById("cable-color");
+  const cableCircuit = document.getElementById("cable-circuit");
+  const cableColorLabel = document.getElementById("cable-color-label");
+  const cableCircuitLabel = document.getElementById("cable-circuit-label");
   const cablePreview = document.getElementById("cable-preview");
   const placementFeedback = document.getElementById("placement-feedback");
   const selectionCard = document.getElementById("selection-card");
@@ -125,10 +132,22 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     cableCores.innerHTML = CORE_COUNTS.map(
       (v) => `<option value="${v}">${v}</option>`,
     ).join("");
+    if (cableColor) {
+      cableColor.innerHTML = CORE_COLOR_OPTIONS.map(
+        (c) => `<option value="${c.id}">${c.label}</option>`,
+      ).join("");
+    }
+    if (cableCircuit) {
+      cableCircuit.innerHTML = CIRCUIT_KINDS.map(
+        (c) => `<option value="${c.id}">${c.label}</option>`,
+      ).join("");
+    }
     const spec = state.cableSpec;
     cableType.value = spec.typeId;
     cableMm2.value = String(spec.mm2);
     cableCores.value = String(spec.cores);
+    if (cableColor) cableColor.value = spec.coreColor || "braun";
+    if (cableCircuit) cableCircuit.value = spec.circuitKind || "last";
     updateCablePreview();
   }
 
@@ -137,17 +156,22 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       typeId: cableType.value,
       mm2: Number(cableMm2.value),
       cores: Number(cableCores.value),
+      coreColor: cableColor?.value,
+      circuitKind: cableCircuit?.value,
     });
   }
 
   function updateCablePreview() {
     const spec = readCableForm();
-    // Keep UI selects in sync if single-core forced
+    const single = isSingleCoreType(spec.typeId);
     cableCores.value = String(spec.cores);
+    cableCores.disabled = single;
+    if (cableColorLabel) cableColorLabel.hidden = !single;
+    if (cableCircuitLabel) cableCircuitLabel.hidden = !single;
     const colors = coreColorsFor(spec);
-    cablePreview.textContent = `${formatCableSpec(spec)} · Enden ${colors
-      .map((c) => c.label)
-      .join("/")}`;
+    cablePreview.textContent = single
+      ? `${formatCableSpec(spec)} · nur in Betriebsmitteln · ohne Schellen`
+      : `${formatCableSpec(spec)} · Enden ${colors.map((c) => c.label).join("/")}`;
     setState({ cableSpec: spec });
   }
 
@@ -155,6 +179,8 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     cableType.addEventListener(evt, updateCablePreview);
     cableMm2.addEventListener(evt, updateCablePreview);
     cableCores.addEventListener(evt, updateCablePreview);
+    cableColor?.addEventListener(evt, updateCablePreview);
+    cableCircuit?.addEventListener(evt, updateCablePreview);
   });
 
   function renderLibrary() {
@@ -423,7 +449,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     } else if (next.mode === "verdrahtung") {
       libraryTitle.textContent = "Verdrahtung";
       libraryHint.textContent =
-        "Typ / Querschnitt / Adern · Punkte auf beliebigen Flächen (Wechsel erlaubt) · Enter = Leitung + Schellen";
+        "Mantelleitung über Flächen · Einzelader nur im Betriebsmittel (Farbe, UV links Last / rechts Steuer) · Enter = fertig";
       libraryBody.hidden = true;
       placementFeedback.textContent = next.wiringFeedback || "Leitungspfad zeichnen";
     }

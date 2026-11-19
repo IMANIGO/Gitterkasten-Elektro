@@ -48,13 +48,13 @@
     },
     {
       "tag": "S3",
-      "label": "Taster START (Schließer)",
+      "label": "Taster",
       "catalogId": "taster"
     },
     {
       "tag": "S0",
-      "label": "Taster STOP (Öffner)",
-      "catalogId": "taster-stop"
+      "label": "Taster",
+      "catalogId": "taster"
     },
     {
       "tag": "E1",
@@ -122,7 +122,7 @@
     },
     {
       "tag": "S0",
-      "catalogId": "taster-stop",
+      "catalogId": "taster",
       "face": "right",
       "fromTopCm": 24,
       "fromBackCm": 28

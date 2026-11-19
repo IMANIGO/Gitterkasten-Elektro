@@ -345,41 +345,6 @@ export function createOutlet(opts = {}) {
   });
 }
 
-export function createSwitch(opts = {}) {
-  return createApDevice({
-    id: "schalter",
-    name: "AP-Wechselschalter",
-    meta: "80 × 80 × 42 mm · Aufputz",
-    face: "switch",
-    depthMm: 42,
-    ...opts,
-  });
-}
-
-export function createPushbutton(opts = {}) {
-  return createApDevice({
-    id: "taster",
-    name: "AP-Taster START",
-    meta: "80 × 80 × 42 mm · Aufputz · Schließer",
-    face: "pushbutton",
-    depthMm: 42,
-    accent: null,
-    ...opts,
-  });
-}
-
-export function createPushbuttonStop(opts = {}) {
-  return createApDevice({
-    id: "taster-stop",
-    name: "AP-Taster STOP",
-    meta: "80 × 80 × 42 mm · Aufputz · Öffner",
-    face: "pushbutton",
-    depthMm: 42,
-    accent: 0xc0392b,
-    ...opts,
-  });
-}
-
 /** CEE 16 A surface socket — industrial red housing, 5-pin face (generic). */
 export function createCeeOutlet({ ghost = false } = {}) {
   const W = 100 * MM;

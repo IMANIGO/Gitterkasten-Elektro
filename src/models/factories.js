@@ -7,11 +7,8 @@ import {
   createMcb1p,
   createMcb3p,
   createOutlet,
-  createPushbutton,
-  createPushbuttonStop,
   createRcbo1p,
   createRcd4p,
-  createSwitch,
   createTerminalDouble,
   createTerminalDoubleN,
   createTerminalL,
@@ -19,6 +16,13 @@ import {
   createTerminalPe,
 } from "./devices.js";
 import { createDistributionBoard } from "./distributionBoard.js";
+import {
+  createPushbutton,
+  createSeries,
+  createSwitch,
+  createSwitchCross,
+  createSwitchOff,
+} from "./rockers.js";
 
 const FACTORIES = {
   distributionBoard: (opts) => createDistributionBoard({ includeSampleTerminals: false, ...opts }),
@@ -33,8 +37,22 @@ const FACTORIES = {
   terminalDoubleN: createTerminalDoubleN,
   outlet: createOutlet,
   switch: createSwitch,
+  switchOff: createSwitchOff,
+  switchCross: createSwitchCross,
   pushbutton: createPushbutton,
-  pushbuttonStop: createPushbuttonStop,
+  seriesAusAus: (opts) => createSeries("serie-aus-aus", "AP-Serie Aus + Aus", ["aus", "aus"], opts),
+  seriesWechselWechsel: (opts) =>
+    createSeries("serie-wechsel-wechsel", "AP-Serie Wechsel + Wechsel", ["wechsel", "wechsel"], opts),
+  seriesKreuzWechsel: (opts) =>
+    createSeries("serie-kreuz-wechsel", "AP-Serie Kreuz + Wechsel", ["kreuz", "wechsel"], opts),
+  seriesTasterTaster: (opts) =>
+    createSeries("serie-taster-taster", "AP-Serie Taster + Taster", ["taster", "taster"], opts),
+  seriesWechselTaster: (opts) =>
+    createSeries("serie-wechsel-taster", "AP-Serie Wechsel + Taster", ["wechsel", "taster"], opts),
+  seriesAusTaster: (opts) =>
+    createSeries("serie-aus-taster", "AP-Serie Aus + Taster", ["aus", "taster"], opts),
+  seriesKreuzTaster: (opts) =>
+    createSeries("serie-kreuz-taster", "AP-Serie Kreuz + Taster", ["kreuz", "taster"], opts),
   ceeOutlet: createCeeOutlet,
   luminaire: createLuminaire,
   junctionBox: createJunctionBox,

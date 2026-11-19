@@ -24,6 +24,8 @@ import {
   inferFaceAtPoint,
   planWaypointAppend,
 } from "./wireFaces.js";
+import { isSingleCoreType } from "./cableTypes.js";
+import { findHostEquipment, snapInsideHost } from "./singleCore.js";
 
 const BOX_BOUNDS = {
   minX: -EBOX.width / 2 + EBOX.frame,
@@ -80,6 +82,8 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
   const draftPoints = [];
   /** @type {string[]} */
   const draftFaces = [];
+  /** Betriebsmittel, in dem eine Einzelader verläuft */
+  let draftHost = null;
   let draftPreview = null;
   let markerGroup = new THREE.Group();
   group.add(markerGroup);
@@ -153,6 +157,7 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     }
 
     const spec = currentSpec();
+    const singleCore = isSingleCoreType(spec.typeId);
     const radius = sheathDiameterM(spec.cores, spec.mm2, spec.typeId) / 2;
     const cores = coreColorsFor(spec);
     const label = formatCableSpec(spec);
@@ -169,7 +174,9 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
         pickable: true,
         id: `leitung-${runs.length + 1}`,
         name: `Leitung ${label}`,
-        meta: `${toMm(length)} mm · ${label} · Schellen 70 / max 220 mm · 90° mit Schelle, R80`,
+        meta: singleCore
+          ? `${toMm(length)} mm · ${label} · Einzelader ohne Schellen`
+          : `${toMm(length)} mm · ${label} · Schellen 70 / max 220 mm · 90° mit Schelle, R80`,
         cableSpec: { ...spec },
       };
       runGroup.add(cable);
@@ -191,7 +198,7 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       runGroup.add(startFan, endFan);
     }
 
-    const layout = computeClampLayout(length, { bends });
+    const layout = singleCore ? [] : computeClampLayout(length, { bends });
     const clamps = [];
     for (const slot of layout) {
       const sample = pointAtDistance(points, slot.distanceM);
@@ -242,21 +249,29 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     }
     const bendClamps = clamps.filter((c) => c.role === "bend-start" || c.role === "bend-end").length;
 
-    const faceText =
-      facesUsed.length > 1
+    const faceText = singleCore
+      ? facesUsed.includes("steuer")
+        ? "UV Steuer rechts"
+        : facesUsed.includes("last")
+          ? "UV Last links"
+          : "im Betriebsmittel"
+      : facesUsed.length > 1
         ? facesUsed.map(faceLabelDe).join(" → ")
         : faceLabelDe(facesUsed[0]);
 
     setState({
-      wiringFeedback: `${label} · ${run.lengthMm} mm · ${faceText} · ${clamps.length} Schellen${
-        bendClamps ? ` · ${bendClamps} an 90°-Kurven (R80)` : ""
-      }${spacingMm != null ? ` · Gerade ${spacingMm} mm` : ""} · ${cores.map((c) => c.label).join("/")} Enden`,
+      wiringFeedback: singleCore
+        ? `${label} · ${run.lengthMm} mm · ${faceText} · ohne Schellen`
+        : `${label} · ${run.lengthMm} mm · ${faceText} · ${clamps.length} Schellen${
+            bendClamps ? ` · ${bendClamps} an 90°-Kurven (R80)` : ""
+          }${spacingMm != null ? ` · Gerade ${spacingMm} mm` : ""} · ${cores.map((c) => c.label).join("/")} Enden`,
       wireCount: runs.length,
       lastWireLengthMm: run.lengthMm,
     });
 
     draftPoints.length = 0;
     draftFaces.length = 0;
+    draftHost = null;
     clearDraftVisuals();
     return run;
   }
@@ -286,6 +301,50 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     });
     if (!hits.length) return;
 
+    const specNow = currentSpec();
+    if (isSingleCoreType(specNow.typeId)) {
+      let host = null;
+      let raw = null;
+      for (const hit of hits) {
+        const found = findHostEquipment(hit.object);
+        if (found) {
+          host = found;
+          raw = hit.point;
+          break;
+        }
+      }
+      if (!host) {
+        setState({
+          wiringFeedback:
+            "Einzelader nur innerhalb von Betriebsmitteln — nicht auf der Fläche und nicht mit Schellen",
+        });
+        return;
+      }
+      if (draftHost && draftHost !== host) {
+        setState({ wiringFeedback: "Einzelader bleibt im selben Betriebsmittel" });
+        return;
+      }
+      draftHost = host;
+      const pt = snapInsideHost(host, raw, specNow.circuitKind);
+      if (draftPoints.length && pt.distanceTo(draftPoints[draftPoints.length - 1]) < 8 * MM) return;
+      const lane =
+        host.userData?.kind === "distributionBoard"
+          ? specNow.circuitKind === "steuer"
+            ? "steuer"
+            : "last"
+          : "geraet";
+      draftPoints.push(pt);
+      draftFaces.push(lane);
+      addMarker(pt, false);
+      refreshDraftPreview();
+      const where =
+        lane === "steuer" ? "UV rechts (Steuer)" : lane === "last" ? "UV links (Last)" : host.userData?.name || "Gerät";
+      setState({
+        wiringFeedback: `${formatCableSpec(specNow)} · ${where} · ohne Schellen · Punkt ${draftPoints.length} · Enter = fertig`,
+      });
+      return;
+    }
+
     let face = null;
     let hitPoint = null;
     for (const hit of hits) {
@@ -306,7 +365,7 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     const prevFace = draftFaces.length ? draftFaces[draftFaces.length - 1] : null;
     appendWaypoint(face, hitPoint);
     refreshDraftPreview();
-    const spec = currentSpec();
+    const spec = specNow;
     const switchNote =
       prevFace && prevFace !== face
         ? ` · Wechsel ${faceLabelDe(prevFace)} → ${faceLabelDe(face)}`
@@ -329,11 +388,13 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     } else if (event.key === "Escape") {
       draftPoints.length = 0;
       draftFaces.length = 0;
+      draftHost = null;
       clearDraftVisuals();
       setState({ wiringFeedback: "Leitung verworfen" });
     } else if (event.key === "Backspace" && draftPoints.length) {
       draftPoints.pop();
       draftFaces.pop();
+      if (!draftPoints.length) draftHost = null;
       clearDraftVisuals();
       draftPoints.forEach((p, i) => {
         const changed = i > 0 && draftFaces[i] !== draftFaces[i - 1];

@@ -9,7 +9,15 @@ const TAG_PREFIX = {
   "cee-16a": "X",
   "schalter": "S",
   "taster": "S",
-  "taster-stop": "S",
+  "schalter-aus": "S",
+  "schalter-kreuz": "S",
+  "serie-aus-aus": "S",
+  "serie-wechsel-wechsel": "S",
+  "serie-kreuz-wechsel": "S",
+  "serie-taster-taster": "S",
+  "serie-wechsel-taster": "S",
+  "serie-aus-taster": "S",
+  "serie-kreuz-taster": "S",
   "leuchte": "E",
   "abzweigdose": "D",
   "uv-3reihen": "UV",
@@ -82,13 +90,7 @@ function assignTags(entries) {
     }
     const prefix = TAG_PREFIX[e.catalogId] || "B";
     counters[prefix] = (counters[prefix] || 0) + 1;
-    // STOP taster often S0
-    if (e.catalogId === "taster-stop" && !usedPreferred.has("S0")) {
-      e.tag = "S0";
-      usedPreferred.add("S0");
-    } else {
-      e.tag = `${prefix}${counters[prefix]}`;
-    }
+    e.tag = `${prefix}${counters[prefix]}`;
   }
   return entries;
 }
@@ -129,6 +131,19 @@ function buildCircuits(surface, wires) {
   });
 
   return circuits;
+}
+
+function symbolKey(id) {
+  if (!id) return "generic";
+  if (id === "taster" || id === "serie-taster-taster") return id.startsWith("serie") ? "serie" : "taster";
+  if (id.startsWith("serie")) return "serie";
+  if (id.includes("kreuz")) return "kreuz";
+  if (id === "schalter" || id.includes("wechsel")) return "wechsel";
+  if (id.includes("aus")) return "aus";
+  if (id.includes("steck") || id.startsWith("cee")) return "steck";
+  if (id.startsWith("uv")) return "uv";
+  if (id.startsWith("leuchte")) return "licht";
+  return "generic";
 }
 
 function guessCableFor(catalogId) {
@@ -230,7 +245,12 @@ export function capturePlanFromScene(placedRoot, wiring = null) {
   const legend = [
     ...placements.map((p) => {
       const item = getCatalogItem(p.catalogId);
-      return { tag: p.tag, label: item?.label || p.catalogId, catalogId: p.catalogId };
+      return {
+        tag: p.tag,
+        label: item?.label || p.catalogId,
+        catalogId: p.catalogId,
+        symbol: item?.symbol || symbolKey(p.catalogId),
+      };
     }),
   ];
 
