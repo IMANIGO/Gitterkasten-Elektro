@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { getCatalogItem, itemDepthM, itemWidthM } from "../catalog/index.js";
 import { createFromFactory, createGhostFromFactory } from "../models/factories.js";
+import { rcboSpecKey } from "../models/rcboSpec.js";
 import { setState, state } from "../state.js";
 import { poseOnDinRail, poseOnLochblech } from "./snap.js";
 
@@ -47,12 +48,24 @@ export function createPlacementController({
     lastPose = null;
   }
 
+  function factoryOpts(item) {
+    if (item?.factory === "controlStation") return { slots: state.stationSlots };
+    if (item?.factory === "rcbo1p") return { spec: state.rcboSpec };
+    return {};
+  }
+
+  function configKey(item) {
+    if (item?.factory === "controlStation") return (state.stationSlots || []).join(",");
+    if (item?.factory === "rcbo1p") return rcboSpecKey(state.rcboSpec);
+    return "";
+  }
+
   function ensureGhost(item) {
-    const slotKey = (state.stationSlots || []).join(",");
+    const slotKey = configKey(item);
     if (ghost && ghost.userData._catalogId === item.id && ghost.userData._slotKey === slotKey) return ghost;
     clearGhost();
     if (!item?.factory || !item.placeable) return null;
-    ghost = createGhostFromFactory(item.factory, { slots: state.stationSlots });
+    ghost = createGhostFromFactory(item.factory, factoryOpts(item));
     if (!ghost) return null;
     ghost.userData._catalogId = item.id;
     ghost.userData._slotKey = slotKey;
@@ -210,14 +223,14 @@ export function createPlacementController({
 
     // Replace: catalog chosen while replace action active
     if (state.selectionAction === "replace" && selection?.getSelected()) {
-      const object = createFromFactory(item.factory, { slots: state.stationSlots });
+      const object = createFromFactory(item.factory, factoryOpts(item));
       if (!object) return;
       selection.applyMoveOrReplace(pose, object, item);
       clearGhost();
       return;
     }
 
-    const object = createFromFactory(item.factory, { slots: state.stationSlots });
+    const object = createFromFactory(item.factory, factoryOpts(item));
     if (!object) return;
     applyPoseToObject(object, pose);
     object.userData.placed = true;

@@ -72,7 +72,7 @@ export const CATALOG_ITEMS = [
     group: "schutzorgane",
     label: "FI/LS-Schalter 1P+N",
     short: "FI/LS",
-    description: "Kombinierter FI/LS 16 A / 30 mA · 2 TE",
+    description: "1P+N · 2 TE · Charakteristik, Strom, Fehlerstrom und Typ wählbar, Aufdruck auf der Front",
     mount: "din",
     te: 2,
     widthMm: 36,

@@ -4,6 +4,7 @@ import {
   getCatalog,
 } from "../catalog/index.js";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
+import { applyRcboSpec, RCBO_FIELDS, rcboSpecKey, specFromFields } from "../models/rcboSpec.js";
 import { setState, state, subscribe } from "../state.js";
 import {
   CABLE_TYPES,
@@ -60,8 +61,12 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const planDocButtons = [...document.querySelectorAll("[data-plan-doc]")];
   const stationSetup = document.getElementById("station-setup");
   const stationEdit = document.getElementById("station-edit");
+  const rcboSetup = document.getElementById("rcbo-setup");
+  const rcboEdit = document.getElementById("rcbo-edit");
   let stationSetupKey = "";
   let stationEditKey = "";
+  let rcboSetupKey = "";
+  let rcboEditKey = "";
 
   function fillStationFields(container, slots, onChange) {
     container.innerHTML = "";
@@ -82,6 +87,71 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       });
       label.appendChild(select);
       container.appendChild(label);
+    });
+  }
+
+  function fillRcboFields(container, spec, onChange) {
+    container.innerHTML = "";
+    const title = document.createElement("p");
+    title.textContent = "Charakteristik";
+    container.appendChild(title);
+    for (const field of RCBO_FIELDS) {
+      const label = document.createElement("label");
+      label.append(field.label);
+      const select = document.createElement("select");
+      select.dataset.field = field.key;
+      select.innerHTML = field.options
+        .map((o) => `<option value="${o.id}">${o.label}</option>`)
+        .join("");
+      select.value = String(spec?.[field.key] ?? "");
+      select.addEventListener("change", () => {
+        const values = {};
+        for (const node of container.querySelectorAll("select")) values[node.dataset.field] = node.value;
+        onChange(specFromFields(values));
+      });
+      label.appendChild(select);
+      container.appendChild(label);
+    }
+  }
+
+  function syncRcboSetup(next) {
+    if (!rcboSetup) return;
+    const show = next.mode === "betriebsmittel" && next.selectedCatalogId === "fils-1p";
+    rcboSetup.hidden = !show;
+    if (!show) {
+      rcboSetupKey = "";
+      return;
+    }
+    const key = rcboSpecKey(next.rcboSpec);
+    if (key === rcboSetupKey && rcboSetup.childElementCount) return;
+    rcboSetupKey = key;
+    fillRcboFields(rcboSetup, next.rcboSpec, (spec) => {
+      rcboSetupKey = rcboSpecKey(spec);
+      setState({ rcboSpec: spec });
+    });
+  }
+
+  function syncRcboEdit(next) {
+    if (!rcboEdit) return;
+    const spec = next.selectedRcboSpec;
+    const show = !!spec && !!next.selectedObjectId;
+    rcboEdit.hidden = !show;
+    if (!show) {
+      rcboEditKey = "";
+      return;
+    }
+    const key = `${next.selectedObjectId}:${rcboSpecKey(spec)}`;
+    if (key === rcboEditKey && rcboEdit.childElementCount) return;
+    rcboEditKey = key;
+    fillRcboFields(rcboEdit, spec, (nextSpec) => {
+      const object = selection?.getSelected?.();
+      if (!object) return;
+      applyRcboSpec(object, nextSpec);
+      rcboEditKey = `${object.uuid}:${rcboSpecKey(nextSpec)}`;
+      setState({
+        selectedRcboSpec: { ...nextSpec },
+        selectedLabel: object.userData.name,
+      });
     });
   }
 
@@ -293,7 +363,13 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
               feedback: object.userData?.placement?.feedback || "gleiche Position",
             };
             import("../models/factories.js").then(({ createFromFactory }) => {
-              const next = createFromFactory(item.factory, { slots: state.stationSlots });
+              const opts =
+                item.factory === "controlStation"
+                  ? { slots: state.stationSlots }
+                  : item.factory === "rcbo1p"
+                    ? { spec: state.rcboSpec }
+                    : {};
+              const next = createFromFactory(item.factory, opts);
               if (!next) return;
               selection.applyMoveOrReplace(pose, next, item);
             });
@@ -525,6 +601,8 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
 
     syncStationSetup(next);
     syncStationEdit(next);
+    syncRcboSetup(next);
+    syncRcboEdit(next);
 
     if (next.hovered && !hasSelection && next.mode === "ansicht") {
       hoverCard.hidden = false;

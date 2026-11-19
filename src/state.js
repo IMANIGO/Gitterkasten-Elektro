@@ -1,4 +1,5 @@
 import { DEFAULT_STATION_SLOTS } from "./models/controlStation.js";
+import { DEFAULT_RCBO_SPEC } from "./models/rcboSpec.js";
 import { defaultCableSpec } from "./wiring/cableTypes.js";
 
 const listeners = new Set();
@@ -18,6 +19,9 @@ export const state = {
   /** Bestückung des Tasterblocks vor dem Platzieren */
   stationSlots: [...DEFAULT_STATION_SLOTS],
   selectedStationSlots: null,
+  /** Charakteristik des FI/LS vor dem Platzieren */
+  rcboSpec: { ...DEFAULT_RCBO_SPEC },
+  selectedRcboSpec: null,
   selectedObjectId: null,
   selectedLabel: null,
   selectedPositionText: null,

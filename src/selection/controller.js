@@ -120,6 +120,7 @@ export function createSelectionController({
       selectedLabel: null,
       selectedPositionText: null,
       selectedStationSlots: null,
+      selectedRcboSpec: null,
       selectionAction: null,
     });
   }
@@ -134,6 +135,7 @@ export function createSelectionController({
       selectedLabel: object.userData?.name || object.userData?.catalogId || "Bauteil",
       selectedPositionText: formatPosition(object),
       selectedStationSlots: object.userData?.slots ? [...object.userData.slots] : null,
+      selectedRcboSpec: object.userData?.rcboSpec ? { ...object.userData.rcboSpec } : null,
       selectedCatalogId: null,
       selectionAction: null,
       placementFeedback: null,
@@ -346,10 +348,16 @@ export function createSelectionController({
   };
 }
 
+function factoryOptsFromState(item) {
+  if (item?.factory === "controlStation") return { slots: state.stationSlots };
+  if (item?.factory === "rcbo1p") return { spec: state.rcboSpec };
+  return {};
+}
+
 export function replaceFromCatalog(selection, catalogId, pose) {
   const item = getCatalogItem(catalogId);
   if (!item?.placeable) return false;
-  const object = createFromFactory(item.factory, { slots: state.stationSlots });
+  const object = createFromFactory(item.factory, factoryOptsFromState(item));
   if (!object) return false;
   return selection.applyMoveOrReplace(pose, object, item);
 }
