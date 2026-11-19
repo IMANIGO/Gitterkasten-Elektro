@@ -8,7 +8,8 @@ import { paintSymbol } from "../catalog/symbols.js";
  * AP-Wippen mit Schaltzeichen (markenneutral, keine Herstellerzeichen).
  * Aufputz-Dose: eine große Wippe 80×80×42, zwei Wippen nebeneinander 151×81×42.
  * Kurzer Leitungsstutzen oben mittig, runde Einführung an der rechten Seite.
- * Taster zusätzlich mit kleinem Querbalken in der unteren Wippenhälfte.
+ * Taster ohne Leuchte: geschlossene weiße Wippe, ohne Fenster und ohne Marke.
+ * Taster mit Leuchte: kleiner dunkler Querbalken als Leuchtmarke unten auf der Wippe.
  * Schaltzeichen bleibt auf der Wippe, aufrecht und parallel zur Front.
  */
 
@@ -117,9 +118,10 @@ function addHousing(root, { W, H, D, ghost }) {
 }
 
 /**
- * Eine große Wippe. Taster und Taster mit Leuchte tragen den Querbalken
- * in der unteren Hälfte. Schaltzeichen bleibt flach auf der Wippe, ohne
- * zusätzliche Drehung, damit es aufrecht lesbar bleibt.
+ * Eine große Wippe. Nur der Taster mit Leuchte trägt den Querbalken
+ * in der unteren Hälfte. Der Taster ohne Leuchte bleibt eine weiße Fläche.
+ * Schaltzeichen bleibt flach auf der Wippe, ohne zusätzliche Drehung,
+ * damit es aufrecht lesbar bleibt.
  */
 function addRocker(root, { kind, x, w, h, zFront, ghost }) {
   const bodyMat = plastic(ghost, 0xfbfaf6, 0.36, 0.03);
@@ -138,7 +140,7 @@ function addRocker(root, { kind, x, w, h, zFront, ghost }) {
   root.add(rocker);
   const faceZ = rockerZ + depth / 2;
 
-  if (kind === "taster" || kind === "taster-licht") {
+  if (kind === "taster-licht") {
     const barMat = plastic(ghost, 0x3e4449, 0.42, 0.08);
     const bar = mesh(new THREE.CapsuleGeometry(1.55 * MM, 20 * MM, 4, 12), barMat);
     bar.name = "tastermarke";
