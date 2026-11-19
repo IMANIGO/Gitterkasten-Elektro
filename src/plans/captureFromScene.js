@@ -38,8 +38,6 @@ const TAG_PREFIX = {
   "reihenklemme-l": "K",
   "reihenklemme-n": "K",
   "reihenklemme-pe": "K",
-  "doppelstockklemme-l": "K",
-  "doppelstockklemme-n": "K",
   "leitungsschelle": "C",
 };
 

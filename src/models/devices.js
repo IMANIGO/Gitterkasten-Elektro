@@ -29,101 +29,116 @@ function createScrew(radius = 1.8 * MM) {
   return g;
 }
 
-/**
- * Push-in spring terminal — cage-clamp class (≈5,2 mm), flush abutting sides.
- * Grey / blue / green-yellow bodies with orange actuator — no logos.
- */
-function createSpringTerminal({
-  id,
-  name,
-  meta,
-  widthMm = 5.2,
-  heightMm = 55,
-  depthMm = 48,
-  colorMat,
-  decks = 1,
-  peStripes = false,
-  ghost = false,
-}) {
-  const width = widthMm * MM;
-  const height = heightMm * MM;
-  const depth = depthMm * MM;
-  const bodyMat = ghost ? materials.ghost.clone() : colorMat;
+const deckGrey = new THREE.MeshStandardMaterial({
+  color: 0xd5d8dc,
+  roughness: 0.48,
+  metalness: 0.04,
+});
+const deckBlue = new THREE.MeshStandardMaterial({
+  color: 0x1f74c4,
+  roughness: 0.46,
+  metalness: 0.05,
+});
+const deckYellow = new THREE.MeshStandardMaterial({
+  color: 0xd6b423,
+  roughness: 0.46,
+  metalness: 0.05,
+});
+const deckGreen = new THREE.MeshStandardMaterial({
+  color: 0x3c8c32,
+  roughness: 0.46,
+  metalness: 0.05,
+});
+const deckMarker = new THREE.MeshStandardMaterial({
+  color: 0xf7f5ef,
+  roughness: 0.62,
+  metalness: 0.02,
+});
+const deckOrange = new THREE.MeshStandardMaterial({
+  color: 0xf07816,
+  roughness: 0.4,
+  metalness: 0.08,
+});
+const deckHole = new THREE.MeshStandardMaterial({
+  color: 0x121416,
+  roughness: 0.55,
+  metalness: 0.15,
+});
 
+function paint(mat, ghost) {
+  return ghost ? materials.ghost.clone() : mat;
+}
+
+/** Housing block. PE is the housing itself in green-yellow bands. */
+function addHousingBox(group, width, height, depth, x, y, z, mat, { pe = false, ghost = false } = {}) {
+  if (!pe) {
+    const body = mesh(new THREE.BoxGeometry(width, height, depth), paint(mat, ghost));
+    body.position.set(x, y, z);
+    group.add(body);
+    return;
+  }
+  const bands = Math.max(3, Math.round(height / (6.2 * MM)));
+  const bandH = height / bands;
+  for (let i = 0; i < bands; i++) {
+    const band = mesh(
+      new THREE.BoxGeometry(width, bandH + 0.06 * MM, depth),
+      paint(i % 2 === 0 ? deckYellow : deckGreen, ghost),
+    );
+    band.position.set(x, y - height / 2 + bandH * (i + 0.5), z);
+    group.add(band);
+  }
+}
+
+/** One deck: round push-in opening with the orange actuator directly above it. */
+function addConductorEntry(group, { yHole, yPush, zFront, ghost }) {
+  const hole = mesh(new THREE.CylinderGeometry(1.62 * MM, 1.62 * MM, 1.15 * MM, 20), paint(deckHole, ghost));
+  hole.rotation.x = Math.PI / 2;
+  hole.position.set(0, yHole, zFront + 0.15 * MM);
+  const well = mesh(new THREE.CylinderGeometry(1.15 * MM, 1.15 * MM, 1.35 * MM, 16), paint(deckHole, ghost));
+  well.rotation.x = Math.PI / 2;
+  well.position.set(0, yHole, zFront + 0.55 * MM);
+  const rim = mesh(new THREE.TorusGeometry(1.62 * MM, 0.26 * MM, 8, 20), paint(deckHole, ghost));
+  rim.position.set(0, yHole, zFront + 0.72 * MM);
+  const slot = mesh(new THREE.BoxGeometry(3.35 * MM, 2.15 * MM, 0.7 * MM), paint(deckHole, ghost));
+  slot.position.set(0, yPush, zFront + 0.2 * MM);
+  const pusher = mesh(new THREE.BoxGeometry(2.85 * MM, 1.45 * MM, 1.35 * MM), paint(deckOrange, ghost));
+  pusher.position.set(0, yPush, zFront + 0.85 * MM);
+  group.add(hole, well, rim, slot, pusher);
+}
+
+/**
+ * Double-deck push-in terminal, 5,2 mm, abutting on the DIN rail.
+ * Two conductor levels, round entries, orange pushers, blank marker.
+ * No manufacturer mark and no type name on the mesh.
+ * Foot and clip stay on the same rail grip as the other DIN devices.
+ */
+function createDoubleDeckTerminal({ id, name, meta, colorMat, pe = false, ghost = false }) {
+  const widthMm = 5.2;
+  const width = widthMm * MM;
   const g = new THREE.Group();
   g.name = name;
 
-  const body = mesh(new THREE.BoxGeometry(width, height, depth), bodyMat);
-  body.position.set(0, height / 2, depth / 2 - 22 * MM);
-  g.add(body);
+  addHousingBox(g, width, 60 * MM, 30 * MM, 0, 33 * MM, 0, colorMat, { pe, ghost });
+  addHousingBox(g, width - 0.04 * MM, 24 * MM, 6.2 * MM, 0, 15 * MM, 16.4 * MM, colorMat, { pe, ghost });
 
-  // Slightly taller shoulder at top (spring-cage silhouette)
-  if (!ghost) {
-    const shoulder = mesh(
-      new THREE.BoxGeometry(width, 6 * MM, depth * 0.55),
-      bodyMat,
-    );
-    shoulder.position.set(0, height - 2 * MM, depth / 2 - 18 * MM);
-    g.add(shoulder);
-  }
+  addConductorEntry(g, { yHole: 12.4 * MM, yPush: 17.6 * MM, zFront: 19.5 * MM, ghost });
+  addConductorEntry(g, { yHole: 42.6 * MM, yPush: 47.8 * MM, zFront: 15 * MM, ghost });
 
-  const foot = mesh(new THREE.BoxGeometry(width, 9 * MM, 11 * MM), ghost ? bodyMat : materials.plasticBlack);
-  foot.position.set(0, 0, -18 * MM);
-  const clip = mesh(new THREE.BoxGeometry(width * 0.95, 3.5 * MM, 7 * MM), ghost ? bodyMat : materials.din);
+  const markerTop = mesh(new THREE.BoxGeometry(width * 0.92, 2.3 * MM, 12 * MM), paint(deckMarker, ghost));
+  markerTop.position.set(0, 64.2 * MM, 4.5 * MM);
+  const markerFace = mesh(new THREE.BoxGeometry(width * 0.92, 4.4 * MM, 0.85 * MM), paint(deckMarker, ghost));
+  markerFace.position.set(0, 60.4 * MM, 15.35 * MM);
+  g.add(markerTop, markerFace);
+
+  addHousingBox(g, width * 0.98, 9 * MM, 11 * MM, 0, 0, -18 * MM, colorMat, { pe, ghost });
+  const clip = mesh(
+    new THREE.BoxGeometry(width * 0.92, 3.5 * MM, 7 * MM),
+    paint(materials.din, ghost),
+  );
   clip.position.set(0, -2 * MM, -22 * MM);
-  g.add(foot, clip);
+  g.add(clip);
 
   if (!ghost) {
-    if (peStripes) {
-      for (let i = 0; i < 3; i++) {
-        const stripe = mesh(
-          new THREE.BoxGeometry(width + 0.2 * MM, 4 * MM, depth * 0.7),
-          materials.pe,
-        );
-        stripe.position.set(0, 14 * MM + i * 14 * MM, depth / 2 - 22 * MM);
-        g.add(stripe);
-      }
-    }
-
-    const deckH = (height - 18 * MM) / decks;
-    for (let d = 0; d < decks; d++) {
-      const y = 12 * MM + deckH * (d + 0.45);
-      // Wire entry funnel
-      const port = mesh(new THREE.BoxGeometry(width * 0.7, 6 * MM, 4 * MM), materials.plasticBlack);
-      port.position.set(0, y, depth / 2 - 20 * MM);
-      g.add(port);
-      // Orange pusher (spring actuator)
-      const act = mesh(
-        new THREE.BoxGeometry(width * 0.92, 4.5 * MM, 2.5 * MM),
-        materials.actuatorOrange,
-      );
-      act.position.set(0, y + 6 * MM, depth / 2 - 20.5 * MM);
-      g.add(act);
-      // Side jumper slot hint
-      const slot = mesh(
-        new THREE.BoxGeometry(1.2 * MM, 3 * MM, 8 * MM),
-        materials.plasticBlack,
-      );
-      slot.position.set(width / 2 - 0.4 * MM, y + 1 * MM, depth / 2 - 28 * MM);
-      g.add(slot);
-    }
-
-    if (decks > 1) {
-      const divider = mesh(
-        new THREE.BoxGeometry(width * 0.95, 2 * MM, depth * 0.78),
-        materials.plasticBlack,
-      );
-      divider.position.set(0, height * 0.5, depth / 2 - 22 * MM);
-      g.add(divider);
-      const midLabel = makeTextPlate("2×", Math.min(widthMm - 0.5, 4.5), 4, {
-        bg: "#2a2c30",
-        fg: "#f2f0ea",
-        size: 48,
-      });
-      midLabel.position.set(0, height * 0.5 + 4 * MM, depth / 2 - 19 * MM);
-      g.add(midLabel);
-    }
-
     g.userData = {
       pickable: true,
       selectable: true,
@@ -133,6 +148,8 @@ function createSpringTerminal({
       meta,
       kind: "terminal",
       widthMm,
+      heightMm: 66,
+      depthMm: 46,
       te: null,
       abutting: true,
     };
@@ -142,66 +159,32 @@ function createSpringTerminal({
 }
 
 export function createTerminalL(opts = {}) {
-  return createSpringTerminal({
+  return createDoubleDeckTerminal({
     id: "reihenklemme-l",
-    name: "Federkraftklemme L",
-    meta: "5,2 × 55 × 48 mm · 2,5 mm² · grau · bündig",
-    widthMm: 5.2,
-    colorMat: materials.terminalGray,
-    decks: 1,
+    name: "Doppelstockklemme L",
+    meta: "5,2 × 66 × 46 mm · 2,5 mm² · 2 Ebenen · grau · bündig",
+    colorMat: deckGrey,
     ...opts,
   });
 }
 
 export function createTerminalN(opts = {}) {
-  return createSpringTerminal({
+  return createDoubleDeckTerminal({
     id: "reihenklemme-n",
-    name: "Federkraftklemme N",
-    meta: "5,2 × 55 × 48 mm · 2,5 mm² · blau · bündig",
-    widthMm: 5.2,
-    colorMat: materials.terminalBlue,
-    decks: 1,
+    name: "Doppelstockklemme N",
+    meta: "5,2 × 66 × 46 mm · 2,5 mm² · 2 Ebenen · blau · bündig",
+    colorMat: deckBlue,
     ...opts,
   });
 }
 
 export function createTerminalPe(opts = {}) {
-  return createSpringTerminal({
+  return createDoubleDeckTerminal({
     id: "reihenklemme-pe",
-    name: "Federkraftklemme PE",
-    meta: "5,2 × 55 × 48 mm · 2,5 mm² · grün-gelb · bündig",
-    widthMm: 5.2,
-    colorMat: materials.terminalPe,
-    decks: 1,
-    peStripes: true,
-    ...opts,
-  });
-}
-
-export function createTerminalDouble(opts = {}) {
-  return createSpringTerminal({
-    id: "doppelstockklemme-l",
-    name: "Doppelstockklemme L/L",
-    meta: "5,2 × 70 × 52 mm · 2,5 mm² · 2 Ebenen · bündig",
-    widthMm: 5.2,
-    heightMm: 70,
-    depthMm: 52,
-    colorMat: materials.terminalGray,
-    decks: 2,
-    ...opts,
-  });
-}
-
-export function createTerminalDoubleN(opts = {}) {
-  return createSpringTerminal({
-    id: "doppelstockklemme-n",
-    name: "Doppelstockklemme N/N",
-    meta: "5,2 × 70 × 52 mm · 2,5 mm² · 2 Ebenen · blau · bündig",
-    widthMm: 5.2,
-    heightMm: 70,
-    depthMm: 52,
-    colorMat: materials.terminalBlue,
-    decks: 2,
+    name: "Doppelstockklemme PE",
+    meta: "5,2 × 66 × 46 mm · 2,5 mm² · 2 Ebenen · grün-gelb · bündig",
+    colorMat: deckYellow,
+    pe: true,
     ...opts,
   });
 }
