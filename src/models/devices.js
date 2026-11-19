@@ -348,91 +348,142 @@ export function createOutlet(opts = {}) {
 }
 
 /**
- * CEE 16 A 5p wall socket: light housing, 25° sloping front, red hinged lid.
+ * CEE 16 A 5p 400 V wall socket, 6h, IP44.
+ * Grey flange, round red housing, socket face inclined 15° with the
+ * bottom rim further from the wall, closed hinged lid, top cable entry.
  * Generic IEC 60309 form, no maker name.
  */
 export function createCeeOutlet({ ghost = false } = {}) {
-  const W = 118 * MM;
-  const H = 132 * MM;
-  const shell = ghost
-    ? materials.ghost.clone()
-    : new THREE.MeshStandardMaterial({ color: 0xf3f1ec, roughness: 0.48, metalness: 0.04 });
+  const shell = ghost ? materials.ghost.clone() : null;
   const red = ghost
     ? shell
-    : new THREE.MeshStandardMaterial({ color: 0xc4452d, roughness: 0.4, metalness: 0.06 });
+    : new THREE.MeshStandardMaterial({ color: 0xb4232a, roughness: 0.52, metalness: 0.04 });
+  const grey = ghost
+    ? shell
+    : new THREE.MeshStandardMaterial({ color: 0xd4d0c8, roughness: 0.62, metalness: 0.05 });
   const dark = ghost
     ? shell
-    : new THREE.MeshStandardMaterial({ color: 0x241e1c, roughness: 0.55, metalness: 0.08 });
+    : new THREE.MeshStandardMaterial({ color: 0x1c1918, roughness: 0.62, metalness: 0.06 });
+  const silver = ghost
+    ? shell
+    : new THREE.MeshStandardMaterial({ color: 0xc5c9ce, roughness: 0.32, metalness: 0.74 });
+
   const root = new THREE.Group();
   root.name = "CEE-Steckdose 16 A";
 
-  const upperH = 78 * MM;
-  const upper = mesh(new THREE.BoxGeometry(W, upperH, 70 * MM), shell);
-  upper.position.set(0, H / 2 - upperH / 2, 35 * MM);
-  root.add(upper);
+  // Grey mounting flange. The shift below puts its back face on local z = 0.
+  const flangeT = 8;
+  const flange = mesh(new THREE.BoxGeometry(87.5 * MM, 118 * MM, flangeT * MM), grey);
+  flange.position.set(0, 8 * MM, (flangeT / 2) * MM);
+  root.add(flange);
 
-  const gland = mesh(new THREE.CylinderGeometry(8 * MM, 9.5 * MM, 12 * MM, 16), shell);
-  gland.position.set(0, H / 2 + 4 * MM, 30 * MM);
-  root.add(gland);
-  const glandNut = mesh(new THREE.CylinderGeometry(11 * MM, 11 * MM, 4 * MM, 6), shell);
-  glandNut.position.set(0, H / 2 + 1 * MM, 30 * MM);
-  root.add(glandNut);
-
-  const nose = new THREE.Group();
-  nose.position.set(0, -16 * MM, 58 * MM);
-  nose.rotation.x = (25 * Math.PI) / 180;
-
-  const cheek = mesh(new THREE.BoxGeometry(W * 0.94, 58 * MM, 42 * MM), shell);
-  cheek.position.set(0, -6 * MM, -8 * MM);
-  nose.add(cheek);
-
-  const collar = mesh(new THREE.CylinderGeometry(31 * MM, 34 * MM, 18 * MM, 32), red);
-  collar.rotation.x = Math.PI / 2;
-  collar.position.set(0, -4 * MM, 12 * MM);
-  nose.add(collar);
-
-  const insert = mesh(new THREE.CylinderGeometry(22 * MM, 22 * MM, 5 * MM, 28), dark);
-  insert.rotation.x = Math.PI / 2;
-  insert.position.set(0, -4 * MM, 18 * MM);
-  nose.add(insert);
-
-  // 6h: Schutzkontakt unten, vier Buchsen im Kreis.
-  for (const [deg, radius] of [
-    [270, 4.6],
-    [198, 3.1],
-    [126, 3.1],
-    [54, 3.1],
-    [342, 3.1],
-  ]) {
-    const angle = (deg * Math.PI) / 180;
+  // External fixing holes, Ø5.3, 76 mm apart.
+  for (const sx of [-1, 1]) {
     const hole = mesh(
-      new THREE.CylinderGeometry(radius * MM, radius * MM, 7 * MM, 10),
-      ghost ? shell : materials.plasticBlack,
+      new THREE.CylinderGeometry(2.65 * MM, 2.65 * MM, (flangeT + 1.2) * MM, 14),
+      dark,
     );
     hole.rotation.x = Math.PI / 2;
-    hole.position.set(Math.cos(angle) * 12 * MM, -4 * MM + Math.sin(angle) * 12 * MM, 20 * MM);
-    nose.add(hole);
+    hole.position.set(sx * 38 * MM, 18 * MM, (flangeT / 2) * MM);
+    root.add(hole);
   }
 
-  const lidPivot = new THREE.Group();
-  lidPivot.position.set(0, 26 * MM, 8 * MM);
-  lidPivot.rotation.x = -0.95;
-  const lid = mesh(new THREE.CylinderGeometry(33 * MM, 33 * MM, 6 * MM, 28), red);
-  lid.rotation.x = Math.PI / 2;
-  lid.position.set(0, -32 * MM, 2 * MM);
-  const grip = mesh(new THREE.BoxGeometry(22 * MM, 7 * MM, 4 * MM), red);
-  grip.position.set(0, -62 * MM, 4 * MM);
-  lidPivot.add(lid, grip);
-  nose.add(lidPivot);
-  root.add(nose);
-
-  const screw = mesh(
-    new THREE.CylinderGeometry(2.1 * MM, 2.1 * MM, 3 * MM, 8),
-    ghost ? shell : materials.brass,
+  // Round housing, slightly wider toward the bottom, back against the flange.
+  const bodyH = 124;
+  const bodyTop = 70;
+  const bodyR = 33;
+  const bodyZ = flangeT + bodyR - 2;
+  const body = mesh(
+    new THREE.CylinderGeometry(30 * MM, bodyR * MM, bodyH * MM, 42),
+    red,
   );
+  body.position.set(0, (bodyTop - bodyH / 2) * MM, bodyZ * MM);
+  root.add(body);
+
+  const dome = mesh(
+    new THREE.SphereGeometry(30 * MM, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2),
+    red,
+  );
+  dome.scale.y = 0.42;
+  dome.position.set(0, bodyTop * MM, bodyZ * MM);
+  root.add(dome);
+
+  // Cable entry on the top, toward the rear.
+  const glandY = bodyTop + 4;
+  const glandZ = bodyZ - 16;
+  const boss = mesh(new THREE.CylinderGeometry(7.5 * MM, 8.5 * MM, 7 * MM, 20), red);
+  boss.position.set(0, glandY * MM, glandZ * MM);
+  root.add(boss);
+  const nut = mesh(new THREE.CylinderGeometry(11.5 * MM, 11.5 * MM, 4 * MM, 6), grey);
+  nut.position.set(0, (glandY - 1.5) * MM, glandZ * MM);
+  root.add(nut);
+  const glandHole = mesh(new THREE.CylinderGeometry(4 * MM, 4 * MM, 2 * MM, 14), dark);
+  glandHole.position.set(0, (glandY + 3.2) * MM, glandZ * MM);
+  root.add(glandHole);
+
+  // 15° snout of the same diameter, half buried in the housing so the lid is the front face.
+  const face = new THREE.Group();
+  face.position.set(0, (bodyTop - bodyH + 34) * MM, (bodyZ + bodyR + 4) * MM);
+  face.rotation.x = (-15 * Math.PI) / 180;
+
+  const neck = mesh(new THREE.CylinderGeometry(bodyR * MM, 31.5 * MM, 28 * MM, 42), red);
+  neck.rotation.x = Math.PI / 2;
+  neck.position.z = 2 * MM;
+  face.add(neck);
+
+  const rim = mesh(new THREE.CylinderGeometry(34.6 * MM, 32.4 * MM, 6 * MM, 42), red);
+  rim.rotation.x = Math.PI / 2;
+  rim.position.z = 16 * MM;
+  face.add(rim);
+
+  const seal = mesh(new THREE.CylinderGeometry(28.2 * MM, 28.2 * MM, 1.4 * MM, 32), dark);
+  seal.rotation.x = Math.PI / 2;
+  seal.position.z = 18.4 * MM;
+  face.add(seal);
+
+  const lid = mesh(new THREE.CylinderGeometry(33.8 * MM, 33.8 * MM, 6 * MM, 42), red);
+  lid.rotation.x = Math.PI / 2;
+  lid.position.z = 22 * MM;
+  face.add(lid);
+
+  // Ribbed latch across the upper rim, spring arm back along the right side.
+  const latch = mesh(new THREE.BoxGeometry(16 * MM, 14 * MM, 8 * MM), red);
+  latch.position.set(0, 26 * MM, 26 * MM);
+  face.add(latch);
+  for (let i = -2; i <= 2; i++) {
+    const rib = mesh(new THREE.BoxGeometry(1.7 * MM, 10 * MM, 1.6 * MM), red);
+    rib.position.set(i * 2.6 * MM, 26 * MM, 30.5 * MM);
+    face.add(rib);
+  }
+  const pin = mesh(new THREE.CylinderGeometry(2.1 * MM, 2.1 * MM, 24 * MM, 12), red);
+  pin.rotation.z = Math.PI / 2;
+  pin.position.set(0, 32 * MM, 20 * MM);
+  face.add(pin);
+  const arm = mesh(new THREE.BoxGeometry(3.2 * MM, 3.6 * MM, 34 * MM), red);
+  arm.position.set(22 * MM, 18 * MM, 2 * MM);
+  arm.rotation.y = -0.35;
+  arm.rotation.x = 0.15;
+  face.add(arm);
+
+  const screw = mesh(new THREE.CylinderGeometry(2.15 * MM, 2.15 * MM, 2.4 * MM, 12), silver);
   screw.rotation.z = Math.PI / 2;
-  screw.position.set(W / 2 - 1 * MM, 18 * MM, 42 * MM);
-  root.add(screw);
+  screw.position.set(34.2 * MM, 1 * MM, 12 * MM);
+  const slot = mesh(new THREE.BoxGeometry(2.8 * MM, 0.5 * MM, 0.45 * MM), dark);
+  slot.position.set(35.3 * MM, 1 * MM, 12 * MM);
+  face.add(screw, slot);
+
+  root.add(face);
+
+  root.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(root);
+  const shiftX = (bounds.min.x + bounds.max.x) / 2;
+  const shiftY = (bounds.min.y + bounds.max.y) / 2;
+  const shiftZ = bounds.min.z;
+  for (const child of root.children) {
+    child.position.x -= shiftX;
+    child.position.y -= shiftY;
+    child.position.z -= shiftZ;
+  }
 
   if (!ghost) {
     root.userData = {
@@ -441,11 +492,11 @@ export function createCeeOutlet({ ghost = false } = {}) {
       id: "cee-16a",
       catalogId: "cee-16a",
       name: "CEE-Steckdose 16 A",
-      meta: "118 × 132 × 96 mm · schräge Front 25° · Klappdeckel · 5p 400 V 6h · IP44",
+      meta: "87,5 × 136,5 × 110 mm · Neigung 15° · Klappdeckel · 5p 400 V 6h · IP44",
       kind: "surfaceDevice",
-      widthMm: 118,
-      heightMm: 132,
-      depthMm: 96,
+      widthMm: 87.5,
+      heightMm: 136.5,
+      depthMm: 110,
     };
   }
   return root;
