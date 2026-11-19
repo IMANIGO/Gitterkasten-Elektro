@@ -1,3 +1,4 @@
+import { DEFAULT_STATION_SLOTS } from "./models/controlStation.js";
 import { defaultCableSpec } from "./wiring/cableTypes.js";
 
 const listeners = new Set();
@@ -14,6 +15,9 @@ export const state = {
   lastWireLengthMm: 0,
   /** @type {{ typeId: string, mm2: number, cores: number }} */
   cableSpec: defaultCableSpec(),
+  /** Bestückung des Tasterblocks vor dem Platzieren */
+  stationSlots: [...DEFAULT_STATION_SLOTS],
+  selectedStationSlots: null,
   selectedObjectId: null,
   selectedLabel: null,
   selectedPositionText: null,

@@ -3,6 +3,7 @@ import {
   formatItemDims,
   getCatalog,
 } from "../catalog/index.js";
+import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
 import { setState, state, subscribe } from "../state.js";
 import {
   CABLE_TYPES,
@@ -57,6 +58,70 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const presetButtons = [...document.querySelectorAll("[data-preset]")];
   const modeButtons = [...document.querySelectorAll("[data-mode]")];
   const planDocButtons = [...document.querySelectorAll("[data-plan-doc]")];
+  const stationSetup = document.getElementById("station-setup");
+  const stationEdit = document.getElementById("station-edit");
+  let stationSetupKey = "";
+  let stationEditKey = "";
+
+  function fillStationFields(container, slots, onChange) {
+    container.innerHTML = "";
+    const title = document.createElement("p");
+    title.textContent = "Bestückung";
+    container.appendChild(title);
+    (slots || []).forEach((value, index) => {
+      const label = document.createElement("label");
+      label.append(`Stelle ${index + 1}`);
+      const select = document.createElement("select");
+      select.innerHTML = STATION_SLOT_OPTIONS.map(
+        (o) => `<option value="${o.id}">${o.label}</option>`,
+      ).join("");
+      select.value = value;
+      select.addEventListener("change", () => {
+        const next = [...container.querySelectorAll("select")].map((s) => s.value);
+        onChange(next);
+      });
+      label.appendChild(select);
+      container.appendChild(label);
+    });
+  }
+
+  function syncStationSetup(next) {
+    if (!stationSetup) return;
+    const show = next.mode === "betriebsmittel" && next.selectedCatalogId === "tasterblock-4";
+    stationSetup.hidden = !show;
+    if (!show) {
+      stationSetupKey = "";
+      return;
+    }
+    const key = (next.stationSlots || []).join("|");
+    if (key === stationSetupKey && stationSetup.childElementCount) return;
+    stationSetupKey = key;
+    fillStationFields(stationSetup, next.stationSlots, (slots) => {
+      stationSetupKey = slots.join("|");
+      setState({ stationSlots: slots });
+    });
+  }
+
+  function syncStationEdit(next) {
+    if (!stationEdit) return;
+    const slots = next.selectedStationSlots;
+    const show = Array.isArray(slots) && slots.length === 4 && !!next.selectedObjectId;
+    stationEdit.hidden = !show;
+    if (!show) {
+      stationEditKey = "";
+      return;
+    }
+    const key = `${next.selectedObjectId}:${slots.join("|")}`;
+    if (key === stationEditKey && stationEdit.childElementCount) return;
+    stationEditKey = key;
+    fillStationFields(stationEdit, slots, (nextSlots) => {
+      const object = selection?.getSelected?.();
+      if (!object) return;
+      applyStationSlots(object, nextSlots);
+      stationEditKey = `${object.uuid}:${nextSlots.join("|")}`;
+      setState({ selectedStationSlots: [...nextSlots] });
+    });
+  }
 
   let currentPlan = plansApi?.getActivePlan?.() || null;
   let lastPlanSceneKey = "";
@@ -228,7 +293,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
               feedback: object.userData?.placement?.feedback || "gleiche Position",
             };
             import("../models/factories.js").then(({ createFromFactory }) => {
-              const next = createFromFactory(item.factory);
+              const next = createFromFactory(item.factory, { slots: state.stationSlots });
               if (!next) return;
               selection.applyMoveOrReplace(pose, next, item);
             });
@@ -457,6 +522,9 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     if (statusMode) {
       statusMode.textContent = `Modus: ${MODE_LABELS[next.mode] || next.mode}`;
     }
+
+    syncStationSetup(next);
+    syncStationEdit(next);
 
     if (next.hovered && !hasSelection && next.mode === "ansicht") {
       hoverCard.hidden = false;

@@ -7,6 +7,7 @@ import { coordsFromPlacedObject, defaultFacesCm } from "./planFromWorld.js";
 const TAG_PREFIX = {
   "steckdose": "X",
   "cee-16a": "X",
+  "tasterblock-4": "TB",
   "schalter": "S",
   "taster": "S",
   "schalter-aus": "S",

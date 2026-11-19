@@ -119,6 +119,7 @@ export function createSelectionController({
       selectedObjectId: null,
       selectedLabel: null,
       selectedPositionText: null,
+      selectedStationSlots: null,
       selectionAction: null,
     });
   }
@@ -132,6 +133,7 @@ export function createSelectionController({
       selectedObjectId: object.uuid,
       selectedLabel: object.userData?.name || object.userData?.catalogId || "Bauteil",
       selectedPositionText: formatPosition(object),
+      selectedStationSlots: object.userData?.slots ? [...object.userData.slots] : null,
       selectedCatalogId: null,
       selectionAction: null,
       placementFeedback: null,
@@ -347,7 +349,7 @@ export function createSelectionController({
 export function replaceFromCatalog(selection, catalogId, pose) {
   const item = getCatalogItem(catalogId);
   if (!item?.placeable) return false;
-  const object = createFromFactory(item.factory);
+  const object = createFromFactory(item.factory, { slots: state.stationSlots });
   if (!object) return false;
   return selection.applyMoveOrReplace(pose, object, item);
 }

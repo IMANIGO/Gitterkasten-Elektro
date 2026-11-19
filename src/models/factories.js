@@ -1,5 +1,6 @@
 import { materials } from "../materials.js";
 import { createCableClamp } from "./cableClamp.js";
+import { createControlStation } from "./controlStation.js";
 import {
   createCeeOutlet,
   createJunctionBox,
@@ -57,6 +58,7 @@ const FACTORIES = {
   luminaire: createLuminaire,
   junctionBox: createJunctionBox,
   cableClamp: createCableClamp,
+  controlStation: (opts) => createControlStation(opts),
 };
 
 export function createFromFactory(factoryName, opts = {}) {
@@ -65,9 +67,11 @@ export function createFromFactory(factoryName, opts = {}) {
   return fn(opts);
 }
 
-export function createGhostFromFactory(factoryName) {
-  const object = createFromFactory(factoryName, { ghost: true });
+export function createGhostFromFactory(factoryName, opts = {}) {
+  const object = createFromFactory(factoryName, { ...opts, ghost: true });
   if (!object) return null;
+  // Steuerstelle behält die farbigen Einsätze, nur das Gehäuse ist durchscheinend.
+  if (factoryName === "controlStation") return object;
   object.traverse((child) => {
     if (!child.isMesh || !child.material) return;
     child.material = materials.ghost.clone();

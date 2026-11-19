@@ -165,6 +165,7 @@ export function renderAufbauplanSvg(plan) {
 
 function symbolForCatalog(id) {
   if (!id) return "generic";
+  if (id.includes("tasterblock")) return "tasterblock";
   if (id.includes("taster") && !id.includes("wechsel") && !id.includes("kreuz") && !id.includes("aus")) return "taster";
   if (id.startsWith("serie")) return "serie";
   if (id.includes("kreuz")) return "kreuz";
@@ -173,6 +174,7 @@ function symbolForCatalog(id) {
   if (id.includes("steck") || id.startsWith("cee")) return "steck";
   if (id.startsWith("uv")) return "uv";
   if (id.startsWith("leuchte")) return "licht";
+  if (id.includes("tasterblock")) return "tasterblock";
   return "generic";
 }
 
@@ -205,6 +207,14 @@ function legendGlyph(symbol, x, y) {
   }
   if (symbol === "licht") {
     return `<circle cx="${x}" cy="${y - 2}" r="5" fill="#f5f0c8" stroke="#111" stroke-width="1"/>`;
+  }
+  if (symbol === "tasterblock") {
+    return [0, 1, 2, 3]
+      .map(
+        (i) =>
+          `<circle cx="${x}" cy="${y - 10 + i * 4}" r="1.6" fill="none" stroke="#111" stroke-width="0.8"/>`,
+      )
+      .join("");
   }
   return `<rect x="${x - 4}" y="${y - 6}" width="8" height="8" fill="none" stroke="#111" stroke-width="1"/>`;
 }

@@ -48,12 +48,14 @@ export function createPlacementController({
   }
 
   function ensureGhost(item) {
-    if (ghost && ghost.userData._catalogId === item.id) return ghost;
+    const slotKey = (state.stationSlots || []).join(",");
+    if (ghost && ghost.userData._catalogId === item.id && ghost.userData._slotKey === slotKey) return ghost;
     clearGhost();
     if (!item?.factory || !item.placeable) return null;
-    ghost = createGhostFromFactory(item.factory);
+    ghost = createGhostFromFactory(item.factory, { slots: state.stationSlots });
     if (!ghost) return null;
     ghost.userData._catalogId = item.id;
+    ghost.userData._slotKey = slotKey;
     ghost.userData.ghost = true;
     ghost.traverse((c) => {
       if (c.isMesh) {
@@ -208,14 +210,14 @@ export function createPlacementController({
 
     // Replace: catalog chosen while replace action active
     if (state.selectionAction === "replace" && selection?.getSelected()) {
-      const object = createFromFactory(item.factory);
+      const object = createFromFactory(item.factory, { slots: state.stationSlots });
       if (!object) return;
       selection.applyMoveOrReplace(pose, object, item);
       clearGhost();
       return;
     }
 
-    const object = createFromFactory(item.factory);
+    const object = createFromFactory(item.factory, { slots: state.stationSlots });
     if (!object) return;
     applyPoseToObject(object, pose);
     object.userData.placed = true;
