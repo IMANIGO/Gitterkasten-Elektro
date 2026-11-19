@@ -13,6 +13,7 @@ function mesh(geo, mat) {
  * OBO-style Greif-Iso-Schelle (lichtgrau), after product 2105012 / 3040 LGR.
  * Cable Ø 6–16 mm; screw clamp with V-cradle; base for Lochblech / M6.
  * Nominal envelope ~22 × 32 × 28 mm (W × H × D along cable).
+ * Back face at local z = 0, same convention as switches and sockets.
  */
 export function createCableClamp({ ghost = false } = {}) {
   const mat = ghost
@@ -67,6 +68,11 @@ export function createCableClamp({ ghost = false } = {}) {
   const slot = mesh(new THREE.BoxGeometry(7 * MM, 1.2 * MM, 1.2 * MM), materials.plasticBlack);
   slot.position.set(0, H + 0.6 * MM, 0);
   root.add(screwHead, slot);
+
+  // Base is the deepest part (D + 2 mm) and was centered, so its back sat
+  // near z = -15 mm and the 1 mm Lochblech gap buried the clamp in the panel.
+  const backOffset = (D + 2 * MM) / 2;
+  for (const child of root.children) child.position.z += backOffset;
 
   if (!ghost) {
     root.userData = {
