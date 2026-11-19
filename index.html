@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="de" translate="no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>E-Box · Digitaler 3D-Gitterkasten GP1–GP2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="viewport"></canvas>
+
+    <div id="ui">
+      <header class="topbar">
+        <div class="brand">
+          <p class="kicker">Elektro-Prüfungssimulator</p>
+          <h1>E-Box</h1>
+          <p class="subtitle">3D-Gitterkasten · GP1–GP2</p>
+        </div>
+        <nav class="presets" aria-label="Kamerapresets">
+          <button type="button" data-preset="gesamt" class="active">Gesamtansicht</button>
+          <button type="button" data-preset="uv">Unterverteilung</button>
+          <button type="button" data-preset="gitter">Lochblech-Nahansicht</button>
+          <button type="button" data-preset="draufsicht">Draufsicht</button>
+        </nav>
+      </header>
+
+      <div class="modebar" role="tablist" aria-label="Arbeitsmodus">
+        <button type="button" class="active" data-mode="ansicht">Ansicht</button>
+        <button type="button" data-mode="betriebsmittel" disabled title="Folgt im nächsten Schritt">
+          Betriebsmittel
+        </button>
+        <button type="button" data-mode="verdrahtung" disabled title="Folgt im nächsten Schritt">
+          Verdrahtung
+        </button>
+        <button type="button" data-mode="aufmass" disabled title="Folgt im nächsten Schritt">
+          Aufmaß
+        </button>
+      </div>
+
+      <aside class="hover-card" id="hover-card" hidden>
+        <p class="kicker">Zeiger</p>
+        <p class="name" id="hover-name"></p>
+        <p class="meta" id="hover-meta"></p>
+      </aside>
+
+      <footer class="statusbar">
+        <span>E-Box 1020 × 510 × 540 mm</span>
+        <span>Lochblech · Raster 50 mm</span>
+        <span>Hutschiene TH35 · TE 18 mm</span>
+        <span>N / PE Sammelschienen</span>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
