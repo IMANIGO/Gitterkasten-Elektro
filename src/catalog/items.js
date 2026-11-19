@@ -172,7 +172,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "schalter-aus",
-    group: "installationsgeraete",
+    group: "schalter",
     label: "AP-Ausschalter",
     short: "Aus",
     description: "Wippe 80 × 80 mm · Ausschalter-Symbol",
@@ -187,7 +187,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "schalter",
-    group: "installationsgeraete",
+    group: "schalter",
     label: "AP-Wechselschalter",
     short: "WS",
     description: "Wippe 80 × 80 mm · Wechselsymbol",
@@ -202,7 +202,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "schalter-kreuz",
-    group: "installationsgeraete",
+    group: "schalter",
     label: "AP-Kreuzschalter",
     short: "Kr",
     description: "Wippe 80 × 80 mm · Kreuzsymbol",
@@ -217,7 +217,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "taster",
-    group: "installationsgeraete",
+    group: "taster",
     label: "AP-Taster",
     short: "Ta",
     description: "Wippe 80 × 80 mm · Tastersymbol",
@@ -232,7 +232,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "schalter-aus-2p",
-    group: "installationsgeraete",
+    group: "schalter",
     label: "AP-Ausschalter 2-polig",
     short: "Aus 2p",
     description: "Wippe 80 × 80 mm · Ausschalter zweipolig",
@@ -247,7 +247,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "schalter-serie",
-    group: "installationsgeraete",
+    group: "serie",
     label: "AP-Serienschalter",
     short: "Serie",
     description: "Wippe 80 × 80 mm · Serienschalter einpolig",
@@ -262,7 +262,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "dimmer",
-    group: "installationsgeraete",
+    group: "schalter",
     label: "AP-Dimmer",
     short: "Dim",
     description: "Wippe 80 × 80 mm · Dimmer",
@@ -277,7 +277,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "taster-leucht",
-    group: "installationsgeraete",
+    group: "taster",
     label: "AP-Taster mit Leuchte",
     short: "Ta L",
     description: "Wippe 80 × 80 mm · Taster mit Leuchte",
@@ -292,7 +292,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "stromstoss",
-    group: "installationsgeraete",
+    group: "schalter",
     label: "AP-Stromstoßschalter",
     short: "StS",
     description: "Wippe 80 × 80 mm · Stromstoßschalter",
@@ -337,7 +337,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "daemmerung",
-    group: "installationsgeraete",
+    group: "schalter",
     label: "AP-Dämmerungsschalter",
     short: "LX",
     description: "Wippe 80 × 80 mm · Dämmerungsschalter",
@@ -352,7 +352,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "serie-aus-aus",
-    group: "installationsgeraete",
+    group: "serienkombinationen",
     label: "AP-Serie Aus + Aus",
     short: "S Aus",
     description: "Aufputz-Kombination 151 × 81 mm · zwei große Ausschaltwippen",
@@ -367,7 +367,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "serie-wechsel-wechsel",
-    group: "installationsgeraete",
+    group: "serienkombinationen",
     label: "AP-Serie Wechsel + Wechsel",
     short: "S WS",
     description: "Aufputz-Kombination 151 × 81 mm · zwei große Wechselwippen",
@@ -382,7 +382,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "serie-kreuz-wechsel",
-    group: "installationsgeraete",
+    group: "serienkombinationen",
     label: "AP-Serie Kreuz + Wechsel",
     short: "S Kr",
     description: "Aufputz-Kombination 151 × 81 mm · Kreuzwippe und Wechselwippe",
@@ -397,7 +397,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "serie-taster-taster",
-    group: "installationsgeraete",
+    group: "serienkombinationen",
     label: "AP-Serie Taster + Taster",
     short: "S Ta",
     description: "Aufputz-Kombination 151 × 81 mm · zwei große Tasterwippen",
@@ -412,7 +412,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "serie-wechsel-taster",
-    group: "installationsgeraete",
+    group: "serienkombinationen",
     label: "AP-Serie Wechsel + Taster",
     short: "S Mix",
     description: "Aufputz-Kombination 151 × 81 mm · Wechselwippe und Tasterwippe",
@@ -427,7 +427,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "serie-aus-taster",
-    group: "installationsgeraete",
+    group: "serienkombinationen",
     label: "AP-Serie Aus + Taster",
     short: "S A/T",
     description: "Aufputz-Kombination 151 × 81 mm · Ausschaltwippe und Tasterwippe",
@@ -442,7 +442,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "serie-kreuz-taster",
-    group: "installationsgeraete",
+    group: "serienkombinationen",
     label: "AP-Serie Kreuz + Taster",
     short: "S K/T",
     description: "Aufputz-Kombination 151 × 81 mm · Kreuzwippe und Tasterwippe",
@@ -499,7 +499,7 @@ export const CATALOG_ITEMS = [
   },
   {
     id: "tasterblock-4",
-    group: "installationsgeraete",
+    group: "taster",
     label: "Tasterblock 4×22",
     short: "TB4",
     description: "Aufputz-Steuerstelle · 4 Bohrungen Ø22 · Lampen, Taster, leer oder zu",
@@ -532,6 +532,10 @@ export const CATALOG_GROUPS = [
   { id: "verteiler", label: "Verteiler" },
   { id: "schutzorgane", label: "Schutzorgane" },
   { id: "klemmen", label: "Klemmen" },
+  { id: "schalter", label: "Schalter" },
+  { id: "taster", label: "Taster" },
+  { id: "serie", label: "Serie" },
+  { id: "serienkombinationen", label: "Serienkombinationen" },
   { id: "installationsgeraete", label: "Installationsgeräte" },
   { id: "befestigung", label: "Befestigung" },
 ];
