@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { UV, UV_POSITION } from "../layout.js";
 import { materials } from "../materials.js";
+import { DIN_RAIL_MOUNT_Y, DIN_RAIL_MOUNT_Z } from "../placement/snap.js";
 import { MM, toMm } from "../units.js";
 import { makeTextPlate } from "./labels.js";
 
@@ -352,14 +353,6 @@ export function createDistributionBoard({
     const ductH = UV.railPitch * 2 + 70 * MM;
     const ductX = innerW / 2 - 22 * MM;
     const ductY = firstRailY - UV.railPitch;
-    const leftDuct = createDuct(ductH);
-    leftDuct.position.set(-ductX, ductY, innerBack + 18 * MM);
-    leftDuct.userData = {
-      pickable: true,
-      id: "kabelkanal-links",
-      name: "Verdrahtungskanal links",
-      meta: "Laststrom · linker Rand",
-    };
     const rightDuct = createDuct(ductH);
     rightDuct.position.set(ductX, ductY, innerBack + 18 * MM);
     rightDuct.userData = {
@@ -368,7 +361,7 @@ export function createDistributionBoard({
       name: "Verdrahtungskanal rechts",
       meta: "Steuerkreis · rechter Rand",
     };
-    root.add(leftDuct, rightDuct);
+    root.add(rightDuct);
 
     const field = createQcField(UV.railLength + 20 * MM);
     field.position.set(0, innerH / 2 - 42 * MM, innerBack + 16 * MM);
@@ -427,7 +420,7 @@ export function createDistributionBoard({
     const startX = -UV.railLength / 2 + 8 * MM;
     kinds.forEach((kind, i) => {
       const k = createReihenklemme(kind);
-      k.position.set(startX + i * pitch, 6 * MM, 22 * MM);
+      k.position.set(startX + i * pitch, DIN_RAIL_MOUNT_Y, DIN_RAIL_MOUNT_Z);
       klemmen.add(k);
     });
     rows[2].add(klemmen);

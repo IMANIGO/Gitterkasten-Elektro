@@ -223,6 +223,16 @@ export function nearestFreeDinX(localX, widthM, railLength, spans, abutting = fa
 }
 
 /**
+ * Rail-local seat shared by every DIN device (drop, measure, and plan).
+ * Y keeps the 90 mm body on the cover slot (slot centre is 50 mm above the rail).
+ * Z puts the modular face (local +36.3 mm) on the cover's inner plane, 65.15 mm
+ * ahead of the rail back, so the clip and foot meet the hat lip instead of
+ * passing through the rail or floating in front of it.
+ */
+export const DIN_RAIL_MOUNT_Y = 6 * MM;
+export const DIN_RAIL_MOUNT_Z = 28.85 * MM;
+
+/**
  * Pose a DIN device on a rail group (local coords of rail).
  * @param {THREE.Object3D} railGroup
  * @param {THREE.Vector3} localPoint point in rail local space
@@ -255,7 +265,7 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
   }
 
   return {
-    position: { x, y: 6 * MM, z: 22 * MM },
+    position: { x, y: DIN_RAIL_MOUNT_Y, z: DIN_RAIL_MOUNT_Z },
     rotation: { x: 0, y: 0, z: 0 },
     parent: railGroup,
     feedback: formatSnapFeedback({
