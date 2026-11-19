@@ -27,7 +27,25 @@ export function snapToTe(localX, teWidth = 1) {
   return Math.min(max, Math.max(min, stepped));
 }
 
-export function formatSnapFeedback({ face, xMm, yMm, zMm, teIndex, teWidth, mount }) {
+/**
+ * Snap to abutting module width (e.g. 5,2 mm Federkraftklemmen) — no gap between neighbors.
+ * Centers land on halfWidth + n * width so side faces touch.
+ */
+export function snapToAbutting(localX, widthM) {
+  const railHalf = UV.railLength / 2;
+  const half = widthM / 2;
+  const min = -railHalf + half;
+  const max = railHalf - half;
+  const origin = -railHalf + half;
+  const index = Math.round((localX - origin) / widthM);
+  const stepped = origin + index * widthM;
+  return Math.min(max, Math.max(min, stepped));
+}
+
+export function formatSnapFeedback({ face, xMm, yMm, zMm, teIndex, teWidth, mount, widthMm, abutting }) {
+  if (mount === "din" && abutting && widthMm != null) {
+    return `Hutschiene · bündig ${widthMm} mm · Pos. ${teIndex != null ? teIndex + 1 : "–"}`;
+  }
   if (mount === "din" && teIndex != null) {
     return `Hutschiene · TE ${teIndex + 1}${teWidth > 1 ? `–${teIndex + teWidth}` : ""} · ${teWidth} TE`;
   }
@@ -144,24 +162,34 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
  * Pose a DIN device on a rail group (local coords of rail).
  * @param {THREE.Object3D} railGroup
  * @param {THREE.Vector3} localPoint point in rail local space
- * @param {number} teWidth
+ * @param {{ teWidth?: number, widthM?: number, widthMm?: number, abutting?: boolean }} opts
  */
-export function poseOnDinRail(railGroup, localPoint, teWidth) {
-  const x = snapToTe(localPoint.x, teWidth);
-  const teIndex = Math.round((x + UV.railLength / 2) / TE - teWidth / 2);
+export function poseOnDinRail(railGroup, localPoint, opts = {}) {
+  const teWidth = typeof opts === "number" ? opts : opts.teWidth || 1;
+  const abutting = typeof opts === "object" && opts.abutting && opts.widthM > 0;
+  const widthM = abutting ? opts.widthM : teWidth * TE;
+
+  const x = abutting ? snapToAbutting(localPoint.x, widthM) : snapToTe(localPoint.x, teWidth);
+  const origin = -UV.railLength / 2 + widthM / 2;
+  const teIndex = Math.max(0, Math.round((x - origin) / widthM));
+
   return {
     position: { x, y: 6 * MM, z: 22 * MM },
     rotation: { x: 0, y: 0, z: 0 },
     parent: railGroup,
     feedback: formatSnapFeedback({
       mount: "din",
-      teIndex: Math.max(0, teIndex),
-      teWidth,
+      teIndex,
+      teWidth: abutting ? null : teWidth,
+      widthMm: abutting ? opts.widthMm ?? toMm(widthM) : null,
+      abutting: !!abutting,
     }),
     face: "din",
     mount: "din",
-    teIndex: Math.max(0, teIndex),
-    teWidth,
+    teIndex,
+    teWidth: abutting ? null : teWidth,
+    widthM,
+    abutting: !!abutting,
   };
 }
 

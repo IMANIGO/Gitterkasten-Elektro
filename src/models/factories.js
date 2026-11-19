@@ -1,11 +1,16 @@
 import { materials } from "../materials.js";
 import { createCableClamp } from "./cableClamp.js";
 import {
+  createJunctionBox,
   createMcb1p,
   createMcb3p,
   createOutlet,
+  createPushbutton,
+  createRcbo1p,
   createRcd4p,
   createSwitch,
+  createTerminalDouble,
+  createTerminalDoubleN,
   createTerminalL,
   createTerminalN,
   createTerminalPe,
@@ -17,11 +22,16 @@ const FACTORIES = {
   mcb1p: createMcb1p,
   mcb3p: createMcb3p,
   rcd4p: createRcd4p,
+  rcbo1p: createRcbo1p,
   terminalL: createTerminalL,
   terminalN: createTerminalN,
   terminalPe: createTerminalPe,
+  terminalDouble: createTerminalDouble,
+  terminalDoubleN: createTerminalDoubleN,
   outlet: createOutlet,
   switch: createSwitch,
+  pushbutton: createPushbutton,
+  junctionBox: createJunctionBox,
   cableClamp: createCableClamp,
 };
 
@@ -34,7 +44,6 @@ export function createFromFactory(factoryName, opts = {}) {
 export function createGhostFromFactory(factoryName) {
   const object = createFromFactory(factoryName, { ghost: true });
   if (!object) return null;
-  // Ensure UV / complex groups also look ghosted
   object.traverse((child) => {
     if (!child.isMesh || !child.material) return;
     child.material = materials.ghost.clone();

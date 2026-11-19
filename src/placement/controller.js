@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { getCatalogItem, itemDepthM } from "../catalog/index.js";
+import { getCatalogItem, itemDepthM, itemWidthM } from "../catalog/index.js";
 import { createFromFactory, createGhostFromFactory } from "../models/factories.js";
 import { setState, state } from "../state.js";
 import { poseOnDinRail, poseOnLochblech } from "./snap.js";
@@ -72,7 +72,14 @@ export function createPlacementController({ canvas, camera, scene, placedRoot, c
         const rail = findDinRail(hit.object);
         if (rail) {
           const local = rail.worldToLocal(hit.point.clone());
-          return poseOnDinRail(rail, local, item.te || 1);
+          if (item.abutting) {
+            return poseOnDinRail(rail, local, {
+              abutting: true,
+              widthM: itemWidthM(item),
+              widthMm: item.widthMm,
+            });
+          }
+          return poseOnDinRail(rail, local, { teWidth: item.te || 1 });
         }
       }
       if (mountWanted === "din") return null;

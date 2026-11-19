@@ -113,6 +113,21 @@ export const materials = {
     metalness: 0.15,
     roughness: 0.4,
   }),
+  deviceBezel: new THREE.MeshStandardMaterial({
+    color: 0xe8e6e0,
+    metalness: 0.08,
+    roughness: 0.42,
+  }),
+  testBtn: new THREE.MeshStandardMaterial({
+    color: 0xc0392b,
+    metalness: 0.05,
+    roughness: 0.4,
+  }),
+  actuatorOrange: new THREE.MeshStandardMaterial({
+    color: 0xe67e22,
+    metalness: 0.05,
+    roughness: 0.45,
+  }),
   apWhite: new THREE.MeshStandardMaterial({
     color: 0xf0eee8,
     metalness: 0.02,
@@ -122,6 +137,16 @@ export const materials = {
     color: 0xe8e4d8,
     metalness: 0.02,
     roughness: 0.5,
+  }),
+  junctionHalogen: new THREE.MeshStandardMaterial({
+    color: 0xd8d2c4,
+    metalness: 0.02,
+    roughness: 0.58,
+  }),
+  junctionInner: new THREE.MeshStandardMaterial({
+    color: 0xc4bbaa,
+    metalness: 0.02,
+    roughness: 0.65,
   }),
   cable: new THREE.MeshStandardMaterial({
     color: 0xb8b0a0,

@@ -5,14 +5,13 @@ import { bendRadiusFor } from "./clampRules.js";
 const CABLE_RADIUS = 4 * MM;
 
 /**
- * Build an orthogonal polyline with filleted 90° corners.
- * @param {THREE.Vector3[]} corners sharp corner waypoints on one face plane
- * @param {{ isBoxCorner?: (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => boolean }} [opts]
- * @returns {{ points: THREE.Vector3[], length: number, bends: Array<{ index: number, kind: string, radius: number }> }}
+ * Orthogonal polyline with true circular 90° fillets (R80 free / R90 box corner).
+ * Previous generation mixed a broken quaternion arc with lerp+bulge — that is replaced.
  */
 export function buildFilletedPath(corners, opts = {}) {
+  if (!corners?.length) return { points: [], length: 0, bends: [] };
   if (corners.length < 2) {
-    return { points: corners.map((p) => p.clone()), length: 0, bends: [] };
+    return { points: [corners[0].clone()], length: 0, bends: [] };
   }
 
   const points = [corners[0].clone()];
@@ -28,49 +27,55 @@ export function buildFilletedPath(corners, opts = {}) {
     const len2 = v2.length();
     if (len1 < 1e-6 || len2 < 1e-6) continue;
 
-    const kind =
-      opts.isBoxCorner?.(prev, curr, next) ? "boxCorner" : "free";
-    const radius = bendRadiusFor(kind);
-    const trim = Math.min(radius, len1 * 0.45, len2 * 0.45);
-
     const d1 = v1.clone().normalize();
     const d2 = v2.clone().normalize();
+    const turnDot = THREE.MathUtils.clamp(-d1.dot(d2), -1, 1);
+    const turnAngle = Math.acos(turnDot);
+    // Straight / nearly collinear — keep the corner point
+    if (turnAngle < 0.08) {
+      points.push(curr.clone());
+      continue;
+    }
+
+    const kind = opts.isBoxCorner?.(prev, curr, next) ? "boxCorner" : "free";
+    const nominalR = bendRadiusFor(kind);
+    // Keep enough straight on both legs
+    const trim = Math.min(nominalR, len1 * 0.45, len2 * 0.45);
+    if (trim < 2 * MM) {
+      points.push(curr.clone());
+      continue;
+    }
+
     const enter = curr.clone().addScaledVector(d1, -trim);
     const leave = curr.clone().addScaledVector(d2, trim);
+    // For a 90° orthogonal fillet with equal trim: center = enter + leave - curr
+    const center = enter.clone().add(leave).sub(curr);
 
     points.push(enter);
 
-    // Quarter-circle samples in the plane of the bend
-    const normal = new THREE.Vector3().crossVectors(d1, d2);
-    if (normal.lengthSq() < 1e-10) {
-      points.push(curr.clone());
-    } else {
-      normal.normalize();
-      const from = d1.clone().negate();
-      const samples = 8;
-      for (let s = 1; s < samples; s++) {
-        const t = s / samples;
-        const q = new THREE.Quaternion().setFromAxisAngle(normal, (Math.PI / 2) * t);
-        const dir = from.clone().applyQuaternion(q);
-        // Arc center = enter + perpendicular inward
-        const inward = new THREE.Vector3().crossVectors(normal, d1).normalize();
-        // Determine inward by checking leave side
-        if (inward.dot(d2) < 0) inward.negate();
-        const center = enter.clone().addScaledVector(inward, trim);
-        const arc = center.clone().addScaledVector(dir.normalize(), trim);
-        // Simpler: lerp enter→leave with bulge
-        const mid = enter.clone().lerp(leave, t);
-        const bulge = Math.sin(Math.PI * t) * (trim * (1 - Math.SQRT1_2));
-        mid.addScaledVector(inward, bulge);
-        points.push(mid);
-        void arc;
-        void q;
-        void dir;
-      }
+    const startOffset = enter.clone().sub(center);
+    const endOffset = leave.clone().sub(center);
+    const axis = new THREE.Vector3().crossVectors(startOffset, endOffset);
+    if (axis.lengthSq() < 1e-12) {
+      points.push(leave.clone());
+      bends.push({ index: points.length - 1, kind, radius: trim });
+      continue;
+    }
+    axis.normalize();
+
+    const startDir = startOffset.clone().normalize();
+    const endDir = endOffset.clone().normalize();
+    const sweep = Math.acos(THREE.MathUtils.clamp(startDir.dot(endDir), -1, 1));
+    const samples = Math.max(6, Math.ceil((sweep / (Math.PI / 2)) * 10));
+    for (let s = 1; s < samples; s++) {
+      const t = s / samples;
+      const q = new THREE.Quaternion().setFromAxisAngle(axis, sweep * t);
+      const p = center.clone().add(startOffset.clone().applyQuaternion(q));
+      points.push(p);
     }
 
     points.push(leave);
-    bends.push({ index: points.length - 1, kind, radius });
+    bends.push({ index: points.length - 1, kind, radius: trim, nominalRadius: nominalR });
   }
 
   points.push(corners[corners.length - 1].clone());
@@ -82,13 +87,38 @@ export function buildFilletedPath(corners, opts = {}) {
   return { points, length, bends };
 }
 
+/** Polyline curve without Catmull-Rom overshoot (keeps fillet geometry). */
+class PolylineCurve extends THREE.Curve {
+  constructor(pts) {
+    super();
+    this.pts = pts;
+    this.cum = [0];
+    for (let i = 1; i < pts.length; i++) {
+      this.cum.push(this.cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+    }
+    this.total = this.cum[this.cum.length - 1] || 1;
+  }
+
+  getPoint(t, optionalTarget = new THREE.Vector3()) {
+    const dist = THREE.MathUtils.clamp(t, 0, 1) * this.total;
+    for (let i = 1; i < this.pts.length; i++) {
+      if (dist <= this.cum[i] || i === this.pts.length - 1) {
+        const segLen = this.cum[i] - this.cum[i - 1];
+        const local = segLen < 1e-9 ? 0 : (dist - this.cum[i - 1]) / segLen;
+        return optionalTarget.copy(this.pts[i - 1]).lerp(this.pts[i], local);
+      }
+    }
+    return optionalTarget.copy(this.pts[this.pts.length - 1]);
+  }
+}
+
 /**
  * Sample a point at distance `dist` along a polyline.
  * @returns {{ point: THREE.Vector3, tangent: THREE.Vector3 } | null}
  */
 export function pointAtDistance(points, dist) {
   if (points.length < 2) return null;
-  let remaining = dist;
+  let remaining = Math.max(0, dist);
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1];
     const b = points[i];
@@ -96,7 +126,12 @@ export function pointAtDistance(points, dist) {
     if (remaining <= seg || i === points.length - 1) {
       const t = seg < 1e-9 ? 0 : Math.min(1, remaining / seg);
       const point = a.clone().lerp(b, t);
-      const tangent = b.clone().sub(a).normalize();
+      const tangent = b.clone().sub(a);
+      if (tangent.lengthSq() < 1e-12 && i > 1) {
+        tangent.copy(a).sub(points[i - 2]);
+      }
+      if (tangent.lengthSq() < 1e-12) tangent.set(1, 0, 0);
+      else tangent.normalize();
       return { point, tangent };
     }
     remaining -= seg;
@@ -106,9 +141,8 @@ export function pointAtDistance(points, dist) {
 
 export function createCableMesh(points, material) {
   if (points.length < 2) return null;
-  const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.05);
-  // Prefer tube along denser polyline without oversmoothing corners
-  const tubular = Math.max(16, points.length * 4);
+  const curve = new PolylineCurve(points);
+  const tubular = Math.max(24, points.length * 3);
   const geo = new THREE.TubeGeometry(curve, tubular, CABLE_RADIUS, 8, false);
   const mesh = new THREE.Mesh(geo, material);
   mesh.castShadow = true;
@@ -118,7 +152,7 @@ export function createCableMesh(points, material) {
 }
 
 /**
- * Detect box-corner bend: turn that involves changing the dominant wall axes near box edges.
+ * Detect box-corner bend: turn near two E-Box boundaries.
  */
 export function isLikelyBoxCorner(prev, curr, next, box = null) {
   void prev;
@@ -130,7 +164,12 @@ export function isLikelyBoxCorner(prev, curr, next, box = null) {
   const nearBack = Math.abs(curr.z - box.minZ) < margin;
   const nearFront = Math.abs(curr.z - box.maxZ) < margin;
   const nearFloor = Math.abs(curr.y - box.minY) < margin;
-  // Corner of box = near two boundaries
   const edges = [nearLeft, nearRight, nearBack, nearFront, nearFloor].filter(Boolean).length;
   return edges >= 2;
+}
+
+/** Arc radius residual for tests (enter/leave ↔ center). */
+export function measureCornerRadii(corners, opts = {}) {
+  const { bends, points } = buildFilletedPath(corners, opts);
+  return { bends, pointCount: points.length };
 }
