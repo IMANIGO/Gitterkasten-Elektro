@@ -220,7 +220,7 @@ export function symbolForCatalog(id) {
   if (id === "schalter-aus-2p") return "aus2";
   if (id === "schalter-serie") return "serieV";
   if (id === "dimmer") return "dimmer";
-  if (id === "stromstoss") return "stromstoss";
+  if (id === "stromstoss" || id === "stromstoss-1te") return "stromstoss";
   if (id === "daemmerung") return "daemmerung";
   if (id.includes("tasterblock")) return "tasterblock";
   if (id.includes("taster") && !id.includes("wechsel") && !id.includes("kreuz") && !id.includes("aus")) {

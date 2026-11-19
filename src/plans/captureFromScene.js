@@ -18,6 +18,7 @@ const TAG_PREFIX = {
   dimmer: "S",
   "taster-leucht": "S",
   stromstoss: "S",
+  "stromstoss-1te": "K",
   daemmerung: "S",
   "serie-aus-aus": "S",
   "serie-wechsel-wechsel": "S",

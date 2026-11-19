@@ -400,6 +400,107 @@ export function createRcd4p(opts = {}) {
   });
 }
 
+/**
+ * Elektronischer Stromstoßschalter, 1 TE, zwei potentialfreie Schließer.
+ * Schmale Klemmenkappen, Drehwahl und Meldeleuchte — ohne Herstellerzeichen
+ * und ohne die typische Blau-Weiß-Teilung der bekannten Baureihen.
+ */
+export function createImpulseRelay({ ghost = false } = {}) {
+  const width = TE;
+  const height = 90 * MM;
+  const depth = 70 * MM;
+  const root = new THREE.Group();
+  root.name = "Stromstoßschalter";
+
+  const shell = ghost
+    ? materials.ghost.clone()
+    : new THREE.MeshStandardMaterial({ color: 0xd7d3ca, roughness: 0.5, metalness: 0.04 });
+  const capMat = ghost
+    ? materials.ghost.clone()
+    : new THREE.MeshStandardMaterial({ color: 0x3c433c, roughness: 0.46, metalness: 0.1 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1a1c1e, roughness: 0.4, metalness: 0.35 });
+  const dialMat = new THREE.MeshStandardMaterial({ color: 0x2a2e32, roughness: 0.38, metalness: 0.18 });
+  const pointerMat = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.42, metalness: 0.04 });
+  const ledMat = new THREE.MeshStandardMaterial({
+    color: 0xe2a24a,
+    roughness: 0.32,
+    metalness: 0.06,
+    emissive: 0x8a5414,
+    emissiveIntensity: ghost ? 0 : 0.45,
+  });
+
+  const bodyD = 44 * MM;
+  const bodyZ = depth / 2 - 26 * MM;
+  const body = mesh(new THREE.BoxGeometry(width - 0.4 * MM, height - 1.2 * MM, bodyD), shell);
+  body.position.set(0, height / 2, bodyZ);
+  root.add(body);
+  const frontZ = bodyZ + bodyD / 2;
+
+  const capH = 15 * MM;
+  const capD = 12 * MM;
+  for (const top of [true, false]) {
+    const y = top ? height - capH / 2 - 0.5 * MM : capH / 2 + 0.5 * MM;
+    const cap = mesh(new THREE.BoxGeometry(width - 0.5 * MM, capH, capD), capMat);
+    cap.position.set(0, y, frontZ + capD / 2 - 1.5 * MM);
+    root.add(cap);
+    for (let i = 0; i < 3; i++) {
+      const hole = mesh(new THREE.CylinderGeometry(1.15 * MM, 1.15 * MM, 1.4 * MM, 12), dark);
+      hole.position.set((i - 1) * 4.3 * MM, top ? y + capH / 2 : y - capH / 2, frontZ + 4 * MM);
+      root.add(hole);
+      const slot = mesh(new THREE.BoxGeometry(1.7 * MM, 0.35 * MM, 0.4 * MM), pointerMat);
+      slot.position.set((i - 1) * 4.3 * MM, top ? y + capH / 2 + 0.15 * MM : y - capH / 2 - 0.15 * MM, frontZ + 4 * MM);
+      root.add(slot);
+    }
+  }
+
+  const dial = mesh(new THREE.CylinderGeometry(4.4 * MM, 4.4 * MM, 3.4 * MM, 24), dialMat);
+  dial.rotation.x = Math.PI / 2;
+  dial.position.set(0, height * 0.48, frontZ + 1.5 * MM);
+  root.add(dial);
+  const pointer = mesh(new THREE.BoxGeometry(1.15 * MM, 3.4 * MM, 0.7 * MM), pointerMat);
+  pointer.position.set(0, height * 0.48 + 1.5 * MM, frontZ + 3.2 * MM);
+  root.add(pointer);
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const tick = mesh(new THREE.BoxGeometry(0.55 * MM, 1.15 * MM, 0.35 * MM), dark);
+    tick.position.set(Math.cos(angle) * 5.7 * MM, height * 0.48 + Math.sin(angle) * 5.7 * MM, frontZ + 0.25 * MM);
+    tick.rotation.z = angle + Math.PI / 2;
+    root.add(tick);
+  }
+
+  const led = mesh(new THREE.SphereGeometry(0.95 * MM, 14, 10), ledMat);
+  led.position.set(0, height * 0.66, frontZ + 0.7 * MM);
+  root.add(led);
+
+  root.add(dinFoot(width - 1 * MM));
+
+  if (ghost) {
+    root.userData = { ghost: true };
+    return root;
+  }
+
+  const rating = makeTextPlate("2S  16A", 15, 5.5, { bg: "#d7d3ca", fg: "#2a2c28", size: 78 });
+  rating.position.set(0, height * 0.3, frontZ + 0.2 * MM);
+  root.add(rating);
+  const volts = makeTextPlate("250 V", 13, 4.2, { bg: "#d7d3ca", fg: "#2a2c28", size: 72 });
+  volts.position.set(0, height * 0.22, frontZ + 0.2 * MM);
+  root.add(volts);
+
+  root.userData = {
+    pickable: true,
+    selectable: true,
+    id: "stromstoss-1te",
+    catalogId: "stromstoss-1te",
+    name: "Stromstoßschalter 2S",
+    meta: "1 TE · 2 Schließer potentialfrei · 16 A 250 V · Steuer 12–230 V",
+    kind: "dinDevice",
+    te: 1,
+    widthMm: toMm(width),
+    symbol: "stromstoss",
+  };
+  return root;
+}
+
 export function createRcbo1p(opts = {}) {
   const spec = normalizeRcboSpec(opts.spec || opts);
   return createDinDevice({

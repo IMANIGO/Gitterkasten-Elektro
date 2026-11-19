@@ -9,6 +9,7 @@ export {
   createMcb3p,
   createRcd4p,
   createRcbo1p,
+  createImpulseRelay,
 } from "./dinDevices.js";
 
 function mesh(geo, mat) {
