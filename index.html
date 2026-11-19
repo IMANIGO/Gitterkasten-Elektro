@@ -79,6 +79,22 @@
         <div class="station-setup" id="rcbo-setup" hidden></div>
         <div class="station-setup" id="mcb-setup" hidden></div>
         <div class="station-setup" id="rcd-setup" hidden></div>
+        <form class="measure-form" id="measure-place" hidden>
+          <p>Maß platzieren</p>
+          <label>Fläche
+            <select id="place-face"></select>
+          </label>
+          <label id="place-row-label" hidden>Reihe
+            <select id="place-row"></select>
+          </label>
+          <label><span id="place-a-label">Von links</span>
+            <input id="place-a" type="number" step="1" value="200" />
+          </label>
+          <label id="place-b-wrap"><span id="place-b-label">Von unten</span>
+            <input id="place-b" type="number" step="1" value="300" />
+          </label>
+          <button type="button" id="btn-place-measure">An Maß platzieren</button>
+        </form>
         <footer class="library-foot">
           <p id="placement-feedback" class="feedback"></p>
         </footer>
@@ -92,6 +108,22 @@
         <div class="station-setup" id="rcbo-edit" hidden></div>
         <div class="station-setup" id="mcb-edit" hidden></div>
         <div class="station-setup" id="rcd-edit" hidden></div>
+        <form class="measure-form" id="measure-move">
+          <p>Maß</p>
+          <label>Fläche
+            <select id="move-face"></select>
+          </label>
+          <label id="move-row-label" hidden>Reihe
+            <select id="move-row"></select>
+          </label>
+          <label><span id="move-a-label">Von links</span>
+            <input id="move-a" type="number" step="1" />
+          </label>
+          <label id="move-b-wrap"><span id="move-b-label">Von unten</span>
+            <input id="move-b" type="number" step="1" />
+          </label>
+          <button type="button" id="btn-move-measure">An Maß setzen</button>
+        </form>
         <div class="selection-actions">
           <button type="button" id="btn-move">Verschieben</button>
           <button type="button" id="btn-replace">Austauschen</button>

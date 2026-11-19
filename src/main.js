@@ -75,6 +75,7 @@ selection = createSelectionController({
   scene,
   placedRoot,
   placement,
+  controls,
 });
 
 const importedPlans = [];

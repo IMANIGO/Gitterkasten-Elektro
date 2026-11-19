@@ -92,7 +92,7 @@ export function createPlacementController({
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
-  function resolvePose(item, hits) {
+  function resolvePose(item, hits, { exact = false } = {}) {
     if (!hits.length) return null;
     const mountWanted = item.mount;
 
@@ -106,9 +106,15 @@ export function createPlacementController({
               abutting: true,
               widthM: itemWidthM(item),
               widthMm: item.widthMm,
+              exact,
+              railLength: rail.userData?.railLength,
             });
           }
-          return poseOnDinRail(rail, local, { teWidth: item.te || 1 });
+          return poseOnDinRail(rail, local, {
+            teWidth: item.te || 1,
+            exact,
+            railLength: rail.userData?.railLength,
+          });
         }
       }
       if (mountWanted === "din") return null;
@@ -119,7 +125,7 @@ export function createPlacementController({
       if (!mount || mount.userData.mount !== "lochblech") continue;
       const face = mount.userData.face;
       if (!face) continue;
-      return poseOnLochblech(face, hit.point, itemDepthM(item));
+      return poseOnLochblech(face, hit.point, itemDepthM(item), { exact });
     }
     return null;
   }
@@ -190,13 +196,13 @@ export function createPlacementController({
     downPos = { x: event.clientX, y: event.clientY };
   }
 
-  function hitsFromEvent(event) {
+  function hitsFromEvent(event, ignoreRoot) {
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
     return raycaster.intersectObjects(scene.children, true).filter((h) => {
       let o = h.object;
       while (o) {
-        if (o.userData?.ghost || o === ghost) return false;
+        if (o.userData?.ghost || o === ghost || o === ignoreRoot) return false;
         o = o.parent;
       }
       return true;
@@ -204,12 +210,25 @@ export function createPlacementController({
   }
 
   function onClick(event) {
-    if (state.mode !== "betriebsmittel" || !state.selectedCatalogId) return;
-    if (event.button !== 0) return;
+    if (state.mode !== "betriebsmittel" || event.button !== 0) return;
+    const selection = getSelection?.();
+    const moving = state.selectionAction === "move" && selection?.getSelected();
+    if (!moving && !state.selectedCatalogId) return;
     if (downPos) {
       const dragged = Math.hypot(event.clientX - downPos.x, event.clientY - downPos.y) > 8;
       downPos = null;
       if (dragged) return;
+    }
+
+    if (moving) {
+      const selected = selection.getSelected();
+      const item = getCatalogItem(selected.userData?.catalogId);
+      if (!item?.placeable) return;
+      const pose = resolvePose(item, hitsFromEvent(event, selected), { exact: true });
+      if (!pose) return;
+      selection.moveToPose(pose);
+      clearGhost();
+      return;
     }
 
     const item = getCatalogItem(state.selectedCatalogId);
@@ -218,11 +237,9 @@ export function createPlacementController({
     const pose = resolvePose(item, hitsFromEvent(event)) || lastPose;
     if (!pose) return;
 
-    const selection = getSelection?.();
-
     // Move existing selection
     if (state.selectionAction === "move" && selection?.getSelected()) {
-      selection.applyMoveOrReplace(pose, null, item);
+      selection.moveToPose(pose);
       clearGhost();
       return;
     }
@@ -265,6 +282,16 @@ export function createPlacementController({
   return {
     clearGhost,
     resolvePose,
+    poseAtEvent(event, item, { exact = false, ignore = null } = {}) {
+      return resolvePose(item, hitsFromEvent(event, ignore), { exact });
+    },
+    listDinRails() {
+      const rails = [];
+      scene.traverse((object) => {
+        if (object.userData?.mount === "din" && object.userData.railLength) rails.push(object);
+      });
+      return rails;
+    },
     dispose() {
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);

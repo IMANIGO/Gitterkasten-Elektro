@@ -106,11 +106,13 @@ export function createSelectionController({
   scene,
   placedRoot,
   placement,
+  controls,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   let selected = null;
   let downPos = null;
+  let drag = null;
 
   function clearSelection() {
     setSelectedHighlight(selected, false);
@@ -174,6 +176,20 @@ export function createSelectionController({
   function onDown(event) {
     if (event.button !== 0) return;
     downPos = { x: event.clientX, y: event.clientY };
+    if (
+      state.mode !== "betriebsmittel" &&
+      state.mode !== "ansicht" &&
+      state.mode !== "plaene"
+    ) {
+      return;
+    }
+    if (state.selectedCatalogId && state.selectionAction !== "move") return;
+    const hit = pickPlaced(event);
+    if (!hit?.userData?.catalogId) return;
+    if (selected !== hit) selectObject(hit);
+    drag = { object: hit, moved: false };
+    if (controls) controls.enabled = false;
+    event.stopPropagation();
   }
 
   function onClick(event) {
@@ -202,8 +218,76 @@ export function createSelectionController({
       if (state.selectionAction === "move" && placement) {
         // Move is handled by placement re-pose — keep selected and wait for place
       }
+    } else if (state.selectionAction === "move") {
+      // Leerfläche neu anklicken verschiebt, Auswahl bleibt.
     } else if (state.mode === "ansicht" || !state.selectedCatalogId) {
       clearSelection();
+    }
+  }
+
+  function applyPose(object, pose) {
+    if (pose.parent) pose.parent.add(object);
+    else placedRoot.add(object);
+    object.position.set(pose.position.x, pose.position.y, pose.position.z);
+    object.rotation.set(pose.rotation.x, pose.rotation.y, pose.rotation.z);
+    object.userData.placement = {
+      mount: pose.mount,
+      face: pose.face,
+      teIndex: pose.teIndex,
+      abutting: pose.abutting,
+      feedback: pose.feedback,
+    };
+  }
+
+  function moveToPose(pose) {
+    if (!selected || !pose) return false;
+    applyPose(selected, pose);
+    setSelectedHighlight(selected, true);
+    setState({
+      selectedPositionText: formatPosition(selected),
+      placementFeedback: `Verschoben · ${pose.feedback}`,
+      selectionAction: "move",
+    });
+    return true;
+  }
+
+  function placeFresh(item, pose) {
+    if (!item || !pose) return false;
+    const object = createFromFactory(item.factory, factoryOptsFromState(item));
+    if (!object) return false;
+    applyPose(object, pose);
+    object.userData.placed = true;
+    object.userData.catalogId = item.id;
+    selectObject(object);
+    setState({
+      selectedCatalogId: null,
+      selectionAction: null,
+      placementFeedback: `Platziert · ${item.label} · ${pose.feedback}`,
+      placedCount: (state.placedCount || 0) + 1,
+    });
+    return true;
+  }
+
+  function onDragMove(event) {
+    if (!drag) return;
+    const item = getCatalogItem(drag.object.userData?.catalogId);
+    if (!item) return;
+    const pose = placement?.poseAtEvent?.(event, item, { exact: true, ignore: drag.object });
+    if (!pose) return;
+    drag.moved = true;
+    applyPose(drag.object, pose);
+  }
+
+  function onDragEnd() {
+    if (!drag) return;
+    const moved = drag.moved;
+    drag = null;
+    if (controls) controls.enabled = true;
+    if (moved && selected) {
+      setState({
+        selectedPositionText: formatPosition(selected),
+        placementFeedback: `Verschoben · ${selected.userData?.placement?.feedback || "exakt"}`,
+      });
     }
   }
 
@@ -220,12 +304,11 @@ export function createSelectionController({
 
   function beginMove() {
     if (!selected) return;
-    const catalogId = selected.userData?.catalogId;
-    if (!catalogId) return;
+    if (!selected.userData?.catalogId) return;
     setState({
       selectionAction: "move",
-      selectedCatalogId: catalogId,
-      placementFeedback: "Neue Position anklicken (Raster / TE)",
+      selectedCatalogId: null,
+      placementFeedback: "Ziehen, neue Stelle anklicken oder Maß eintragen",
     });
   }
 
@@ -326,8 +409,10 @@ export function createSelectionController({
     }
   }
 
-  canvas.addEventListener("pointerdown", onDown);
+  canvas.addEventListener("pointerdown", onDown, true);
   canvas.addEventListener("pointerup", onClick);
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd);
   window.addEventListener("keydown", onKey);
 
   return {
@@ -338,14 +423,19 @@ export function createSelectionController({
     beginMove,
     beginReplace,
     applyMoveOrReplace,
+    moveToPose,
+    placeFresh,
+    listDinRails: () => placement?.listDinRails?.() || [],
     refreshPositionText() {
       if (selected) {
         setState({ selectedPositionText: formatPosition(selected) });
       }
     },
     dispose() {
-      canvas.removeEventListener("pointerdown", onDown);
+      canvas.removeEventListener("pointerdown", onDown, true);
       canvas.removeEventListener("pointerup", onClick);
+      window.removeEventListener("pointermove", onDragMove);
+      window.removeEventListener("pointerup", onDragEnd);
       window.removeEventListener("keydown", onKey);
       clearSelection();
     },

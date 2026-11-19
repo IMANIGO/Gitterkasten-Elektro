@@ -2,9 +2,21 @@ import {
   describeCatalogItem,
   formatItemDims,
   getCatalog,
+  getCatalogItem,
+  itemDepthM,
 } from "../catalog/index.js";
 import { rankCatalogItems } from "../catalog/search.js";
+import * as THREE from "three";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
+import {
+  MEASURE_FACES,
+  dinMeasureFromLocal,
+  measureLabels,
+  panelMeasuresFromWorld,
+  poseFromDinMeasure,
+  poseFromPanelMeasures,
+} from "../placement/measures.js";
+import { inferFaceFromWorld } from "../plans/planFromWorld.js";
 import { applyMcbSpec, MCB_FIELDS, mcbSpecFromFields, mcbSpecKey } from "../models/mcbSpec.js";
 import { applyRcdSpec, RCD_FIELDS, rcdSpecFromFields, rcdSpecKey } from "../models/rcdSpec.js";
 import { applyRcboSpec, RCBO_FIELDS, rcboSpecKey, specFromFields } from "../models/rcboSpec.js";
@@ -604,6 +616,110 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   });
   document.getElementById("btn-move")?.addEventListener("click", () => {
     selection?.beginMove?.();
+    document.getElementById("move-a")?.focus();
+  });
+
+  const measurePlace = document.getElementById("measure-place");
+  const moveForm = document.getElementById("measure-move");
+
+  function fillFaceSelect(select) {
+    if (!select || select.dataset.ready) return;
+    select.innerHTML = MEASURE_FACES.map((face) => `<option value="${face.id}">${face.label}</option>`).join("");
+    select.dataset.ready = "1";
+  }
+
+  function fillRailSelect(select, preferred) {
+    if (!select) return;
+    const rails = selection?.listDinRails?.() || [];
+    select.innerHTML = rails
+      .map((rail) => `<option value="${rail.uuid}">${rail.userData?.name || "Hutschiene"}</option>`)
+      .join("");
+    if (preferred && rails.some((rail) => rail.uuid === preferred)) select.value = preferred;
+  }
+
+  function applyMeasureLabels(prefix, face) {
+    const labels = measureLabels(face);
+    const aLabel = document.getElementById(`${prefix}-a-label`);
+    const bWrap = document.getElementById(`${prefix}-b-wrap`);
+    const bLabel = document.getElementById(`${prefix}-b-label`);
+    const rowLabel = document.getElementById(`${prefix}-row-label`);
+    if (aLabel) aLabel.textContent = labels.a;
+    if (bWrap) bWrap.hidden = !labels.b;
+    if (bLabel && labels.b) bLabel.textContent = labels.b;
+    if (rowLabel) rowLabel.hidden = face !== "din";
+  }
+
+  function poseFromForm(prefix, item) {
+    const face = document.getElementById(`${prefix}-face`)?.value;
+    const a = Number(document.getElementById(`${prefix}-a`)?.value);
+    const b = Number(document.getElementById(`${prefix}-b`)?.value);
+    if (!Number.isFinite(a) || (face !== "din" && !Number.isFinite(b))) {
+      setState({ placementFeedback: "Maß fehlt" });
+      return null;
+    }
+    if (face === "din") {
+      const rails = selection?.listDinRails?.() || [];
+      const rail = rails.find((entry) => entry.uuid === document.getElementById(`${prefix}-row`)?.value) || rails[0];
+      if (!rail) {
+        setState({ placementFeedback: "Keine Hutschiene im Aufbau" });
+        return null;
+      }
+      return poseFromDinMeasure(rail, a, item);
+    }
+    return poseFromPanelMeasures(face, a, b, itemDepthM(item));
+  }
+
+  function syncMoveForm() {
+    const object = selection?.getSelected?.();
+    if (!moveForm || !object) return;
+    if (moveForm.contains(document.activeElement)) return;
+    fillFaceSelect(document.getElementById("move-face"));
+    const world = new THREE.Vector3();
+    object.getWorldPosition(world);
+    const stored = object.userData?.placement?.face;
+    const face = stored || inferFaceFromWorld(world);
+    const faceSelect = document.getElementById("move-face");
+    if (faceSelect && [...faceSelect.options].some((option) => option.value === face)) faceSelect.value = face;
+    applyMeasureLabels("move", faceSelect?.value || "back");
+    const railParent = object.parent?.userData?.mount === "din" ? object.parent : null;
+    fillRailSelect(document.getElementById("move-row"), railParent?.uuid);
+    if ((faceSelect?.value || face) === "din" && railParent) {
+      document.getElementById("move-a").value = String(
+        dinMeasureFromLocal(object.position.x, railParent.userData.railLength),
+      );
+      return;
+    }
+    const measures = panelMeasuresFromWorld(faceSelect?.value || face, world);
+    document.getElementById("move-a").value = String(measures.a);
+    document.getElementById("move-b").value = String(measures.b);
+  }
+
+  fillFaceSelect(document.getElementById("move-face"));
+  fillFaceSelect(document.getElementById("place-face"));
+  applyMeasureLabels("move", "back");
+  applyMeasureLabels("place", "back");
+  document.getElementById("move-face")?.addEventListener("change", (event) => {
+    applyMeasureLabels("move", event.target.value);
+    fillRailSelect(document.getElementById("move-row"));
+  });
+  document.getElementById("place-face")?.addEventListener("change", (event) => {
+    applyMeasureLabels("place", event.target.value);
+    fillRailSelect(document.getElementById("place-row"));
+  });
+  document.getElementById("btn-move-measure")?.addEventListener("click", () => {
+    const object = selection?.getSelected?.();
+    const item = getCatalogItem(object?.userData?.catalogId);
+    if (!item) return;
+    const pose = poseFromForm("move", item);
+    if (!pose) return;
+    selection.moveToPose(pose);
+  });
+  document.getElementById("btn-place-measure")?.addEventListener("click", () => {
+    const item = getCatalogItem(state.selectedCatalogId);
+    if (!item?.placeable) return;
+    const pose = poseFromForm("place", item);
+    if (!pose) return;
+    selection.placeFresh(item, pose);
   });
   document.getElementById("btn-replace")?.addEventListener("click", () => {
     selection?.beginReplace?.();
@@ -748,6 +864,14 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     }
 
     if (librarySearch) librarySearch.hidden = next.mode !== "betriebsmittel";
+    if (measurePlace) {
+      measurePlace.hidden = !(
+        next.mode === "betriebsmittel" &&
+        next.selectedCatalogId &&
+        next.selectionAction !== "move"
+      );
+    }
+    if (next.selectedObjectId) syncMoveForm();
 
     if (next.mode === "betriebsmittel") {
       libraryTitle.textContent = "Betriebsmittel";
@@ -755,7 +879,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
         next.selectionAction === "replace"
           ? "Ersatz wählen, dann Montagepunkt anklicken"
           : next.selectionAction === "move"
-            ? "Neue Position auf Raster / TE anklicken"
+            ? "Ziehen, neue Stelle anklicken oder Maß eintragen"
             : "Artikel wählen → platzieren (Auswahl springt zurück) · Bauteil anklicken zum Bearbeiten";
       libraryBody.hidden = false;
       [...libraryBody.querySelectorAll(".catalog-item")].forEach((btn) => {

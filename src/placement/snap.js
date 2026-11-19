@@ -42,7 +42,7 @@ export function snapToAbutting(localX, widthM) {
   return Math.min(max, Math.max(min, stepped));
 }
 
-export function formatSnapFeedback({ face, xMm, yMm, zMm, teIndex, teWidth, mount, widthMm, abutting }) {
+export function formatSnapFeedback({ face, xMm, yMm, zMm, teIndex, teWidth, mount, widthMm, abutting, exact }) {
   if (mount === "din" && abutting && widthMm != null) {
     return `Hutschiene · bündig ${widthMm} mm · Pos. ${teIndex != null ? teIndex + 1 : "–"}`;
   }
@@ -54,7 +54,7 @@ export function formatSnapFeedback({ face, xMm, yMm, zMm, teIndex, teWidth, moun
   if (xMm != null) parts.push(`X ${xMm} mm`);
   if (yMm != null) parts.push(`Y ${yMm} mm`);
   if (zMm != null) parts.push(`Z ${zMm} mm`);
-  parts.push("Raster 50 mm");
+  if (!exact) parts.push("Raster 50 mm");
   return parts.join(" · ");
 }
 
@@ -77,13 +77,14 @@ function faceLabel(face) {
  * Place a Lochblech-mounted object so its back sits on the face.
  * Object local: +Z is "front"/open; footprint centered on XY.
  */
-export function poseOnLochblech(face, hitPoint, itemDepthM) {
+export function poseOnLochblech(face, hitPoint, itemDepthM, { exact = false } = {}) {
   const standoff = Math.max(itemDepthM / 2, 2 * MM);
   const T = EBOX.panelThickness;
+  const use = (value, origin) => (exact ? value : snapToGrid(value, origin));
 
   if (face === "back") {
-    const x = snapToGrid(hitPoint.x);
-    const y = snapToGrid(hitPoint.y, EBOX_FLOOR_Y + EBOX.frame);
+    const x = use(hitPoint.x, 0);
+    const y = use(hitPoint.y, EBOX_FLOOR_Y + EBOX.frame);
     const z = T + standoff;
     return {
       position: { x, y, z },
@@ -93,6 +94,7 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
         xMm: toMm(x),
         yMm: toMm(y - EBOX_FLOOR_Y),
         mount: "lochblech",
+        exact,
       }),
       face,
       mount: "lochblech",
@@ -100,8 +102,8 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
   }
 
   if (face === "floor") {
-    const x = snapToGrid(hitPoint.x);
-    const z = snapToGrid(hitPoint.z);
+    const x = use(hitPoint.x, 0);
+    const z = use(hitPoint.z, 0);
     const y = EBOX_FLOOR_Y + T + standoff;
     return {
       position: { x, y, z },
@@ -113,6 +115,7 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
         xMm: toMm(x),
         zMm: toMm(z),
         mount: "lochblech",
+        exact,
       }),
       face,
       mount: "lochblech",
@@ -120,8 +123,8 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
   }
 
   if (face === "left") {
-    const z = snapToGrid(hitPoint.z);
-    const y = snapToGrid(hitPoint.y, EBOX_FLOOR_Y + EBOX.frame);
+    const z = use(hitPoint.z, 0);
+    const y = use(hitPoint.y, EBOX_FLOOR_Y + EBOX.frame);
     const x = -EBOX.width / 2 + T + standoff;
     return {
       position: { x, y, z },
@@ -131,6 +134,7 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
         zMm: toMm(z),
         yMm: toMm(y - EBOX_FLOOR_Y),
         mount: "lochblech",
+        exact,
       }),
       face,
       mount: "lochblech",
@@ -138,8 +142,8 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
   }
 
   if (face === "right") {
-    const z = snapToGrid(hitPoint.z);
-    const y = snapToGrid(hitPoint.y, EBOX_FLOOR_Y + EBOX.frame);
+    const z = use(hitPoint.z, 0);
+    const y = use(hitPoint.y, EBOX_FLOOR_Y + EBOX.frame);
     const x = EBOX.width / 2 - T - standoff;
     return {
       position: { x, y, z },
@@ -149,6 +153,7 @@ export function poseOnLochblech(face, hitPoint, itemDepthM) {
         zMm: toMm(z),
         yMm: toMm(y - EBOX_FLOOR_Y),
         mount: "lochblech",
+        exact,
       }),
       face,
       mount: "lochblech",
@@ -168,8 +173,12 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
   const teWidth = typeof opts === "number" ? opts : opts.teWidth || 1;
   const abutting = typeof opts === "object" && opts.abutting && opts.widthM > 0;
   const widthM = abutting ? opts.widthM : teWidth * TE;
-
-  const x = abutting ? snapToAbutting(localPoint.x, widthM) : snapToTe(localPoint.x, teWidth);
+  const half = widthM / 2;
+  const railHalf = (opts.railLength || UV.railLength) / 2;
+  const min = -railHalf + half;
+  const max = railHalf - half;
+  const raw = abutting ? snapToAbutting(localPoint.x, widthM) : snapToTe(localPoint.x, teWidth);
+  const x = opts.exact ? Math.min(max, Math.max(min, localPoint.x)) : raw;
   const origin = -UV.railLength / 2 + widthM / 2;
   const teIndex = Math.max(0, Math.round((x - origin) / widthM));
 

@@ -539,6 +539,48 @@ button:disabled {
   color: var(--muted);
 }
 
+.measure-form {
+  display: grid;
+  gap: 6px;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.measure-form[hidden] {
+  display: none !important;
+}
+
+.measure-form p {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.measure-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.measure-form input,
+.measure-form select {
+  appearance: none;
+  background: rgba(242, 240, 234, 0.06);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.measure-form button {
+  justify-self: start;
+}
+
 .library-foot {
   border-top: 1px solid var(--line);
   padding: 10px 14px;
