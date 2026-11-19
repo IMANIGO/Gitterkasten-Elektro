@@ -16,9 +16,9 @@ export const CABLE_TYPES = [
   {
     id: "h07rn-f",
     label: "H07RN-F",
-    description: "Gummischlauchleitung mit PE",
+    description: "Gummischlauchleitung, schwarzer Mantel, mit PE",
     hasPe: true,
-    sheath: 0x1c1c1c,
+    sheath: 0x121212,
   },
   {
     id: "h07v-u",
@@ -113,6 +113,13 @@ export function coreColorsFor({ typeId, cores, coreColor }) {
   return [L[0], L[1], L[2], N, PE];
 }
 
+/** Mantelfarbe für die 3D-Leitung. Einzelader folgt der gewählten Aderfarbe. */
+export function sheathColor(spec) {
+  const type = CABLE_TYPES.find((t) => t.id === spec?.typeId);
+  if (type?.singleCore) return coreColorsFor(spec)[0]?.color ?? 0x3a3a3a;
+  return type?.sheath ?? 0xb8b0a0;
+}
+
 export function formatCableSpec(spec) {
   if (!spec) return "";
   const type = CABLE_TYPES.find((t) => t.id === spec.typeId);
@@ -122,6 +129,7 @@ export function formatCableSpec(spec) {
     const kind = spec.circuitKind === "steuer" ? "Steuer" : "Last";
     return `${base} ${color} · ${kind}`;
   }
+  if (spec.typeId === "h07rn-f") return `${base} · schwarzer Mantel`;
   return base;
 }
 

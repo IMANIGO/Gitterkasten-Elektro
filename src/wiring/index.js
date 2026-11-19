@@ -9,6 +9,7 @@ import {
   coreColorsFor,
   formatCableSpec,
   normalizeCableSpec,
+  sheathColor,
   sheathDiameterM,
 } from "./cableTypes.js";
 import {
@@ -62,10 +63,7 @@ function orientClamp(clamp, point, tangent, face) {
 
 function sheathMaterial(spec) {
   const mat = materials.cable.clone();
-  if (spec.typeId === "h07v-u") {
-    const cores = coreColorsFor(spec);
-    mat.color.set(cores[0]?.color ?? 0x3a3a3a);
-  }
+  mat.color.set(sheathColor(spec));
   return mat;
 }
 
