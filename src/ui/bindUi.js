@@ -3,6 +3,7 @@ import {
   formatItemDims,
   getCatalog,
 } from "../catalog/index.js";
+import { rankCatalogItems } from "../catalog/search.js";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
 import { applyMcbSpec, MCB_FIELDS, mcbSpecFromFields, mcbSpecKey } from "../models/mcbSpec.js";
 import { applyRcdSpec, RCD_FIELDS, rcdSpecFromFields, rcdSpecKey } from "../models/rcdSpec.js";
@@ -36,6 +37,8 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const libraryTitle = document.getElementById("library-title");
   const libraryHint = document.getElementById("library-hint");
   const libraryBody = document.getElementById("library-body");
+  const librarySearch = document.getElementById("library-search");
+  const libraryQuery = document.getElementById("library-query");
   const cableForm = document.getElementById("cable-form");
   const cableType = document.getElementById("cable-type");
   const cableMm2 = document.getElementById("cable-mm2");
@@ -461,8 +464,22 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
 
   function renderLibrary() {
     const catalog = getCatalog();
+    const query = libraryQuery?.value || "";
+    const ranked = rankCatalogItems(catalog.items, query);
+    const scoreOf = new Map(ranked.map((entry) => [entry.item.id, entry.score]));
+    const searching = query.trim().length > 0;
     libraryBody.innerHTML = "";
+    if (searching && !ranked.length) {
+      const empty = document.createElement("p");
+      empty.className = "library-empty";
+      empty.textContent = "Nichts gefunden";
+      libraryBody.appendChild(empty);
+      return;
+    }
     for (const group of catalog.groups) {
+      let items = group.items.filter((item) => !searching || scoreOf.has(item.id));
+      if (!items.length) continue;
+      if (searching) items = items.slice().sort((a, b) => scoreOf.get(b.id) - scoreOf.get(a.id));
       const section = document.createElement("section");
       section.className = "library-group";
       const title = document.createElement("h3");
@@ -470,7 +487,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       title.textContent = group.label;
       section.appendChild(title);
 
-      for (const item of group.items) {
+      for (const item of items) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "catalog-item";
@@ -528,6 +545,10 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
         section.appendChild(btn);
       }
       libraryBody.appendChild(section);
+    }
+    const active = state.selectedCatalogId;
+    if (active) {
+      libraryBody.querySelector(`[data-catalog-id="${active}"]`)?.classList.add("active");
     }
   }
 
@@ -613,6 +634,13 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
 
   fillCableSelects();
   renderLibrary();
+  libraryQuery?.addEventListener("input", () => renderLibrary());
+  libraryQuery?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      libraryQuery.value = "";
+      renderLibrary();
+    }
+  });
   fillPlanSelect();
   // Default: live plan from scene (not the example photo/template)
   if (plansApi) {
@@ -718,6 +746,8 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       selectionName.textContent = next.selectedLabel || "Bauteil";
       selectionDims.textContent = next.selectedPositionText || "";
     }
+
+    if (librarySearch) librarySearch.hidden = next.mode !== "betriebsmittel";
 
     if (next.mode === "betriebsmittel") {
       libraryTitle.textContent = "Betriebsmittel";
