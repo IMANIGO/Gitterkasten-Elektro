@@ -540,6 +540,37 @@ export const CATALOG_GROUPS = [
   { id: "befestigung", label: "Befestigung" },
 ];
 
+/**
+ * Bibliothek in zwei Ordnern.
+ * Außerhalb: Lochblech und Wand. Innerhalb: Hutschiene in der UV.
+ * groupIds ist nur die Anzeigereihenfolge. Der Ordner eines Artikels
+ * folgt der Montage (mount), damit eine Gruppe in beiden Ordnern stehen kann.
+ */
+export const CATALOG_FOLDERS = [
+  {
+    id: "ausserhalb",
+    label: "Außerhalb der Verteilung",
+    groupIds: [
+      "schalter",
+      "taster",
+      "serie",
+      "serienkombinationen",
+      "verteiler",
+      "installationsgeraete",
+      "befestigung",
+    ],
+  },
+  {
+    id: "innerhalb",
+    label: "Innerhalb der Verteilung",
+    groupIds: ["schutzorgane", "klemmen", "installationsgeraete"],
+  },
+];
+
+export function itemFolderId(item) {
+  return item?.mount === "din" ? "innerhalb" : "ausserhalb";
+}
+
 export function formatItemDims(item) {
   if (item.abutting && item.widthMm) {
     return `${item.widthMm} mm · bündig · ${item.heightMm} × ${item.depthMm} mm`;

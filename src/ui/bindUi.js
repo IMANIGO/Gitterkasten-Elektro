@@ -479,6 +479,99 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
 
   let libraryView = "list";
   const libraryViewBar = document.getElementById("library-view");
+  const folderOpen = new Map();
+
+  function renderLibraryGroup(group, items, folder, searching) {
+    const section = document.createElement("section");
+    section.className = "library-group";
+    section.dataset.group = group.id;
+    const title = document.createElement("h3");
+    title.className = "library-group-title";
+    title.textContent = group.label;
+    section.appendChild(title);
+
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "catalog-item";
+      btn.dataset.catalogId = item.id;
+      btn.dataset.folder = folder?.id || "";
+      btn.disabled = !item.placeable;
+      btn.title = libraryView === "tiles" ? "" : item.description || "";
+      const thumb = document.createElement("img");
+      thumb.className = "item-thumb";
+      thumb.alt = "";
+      const copy = document.createElement("span");
+      copy.className = "item-copy";
+      const label = document.createElement("span");
+      label.className = "item-label";
+      label.textContent = item.label;
+      const dims = document.createElement("span");
+      dims.className = "item-dims";
+      dims.textContent = `${formatItemDims(item)}${item.placeable ? "" : " · folgt"}`;
+      const desc = document.createElement("span");
+      desc.className = "item-desc";
+      desc.textContent = item.description || "";
+      copy.append(label, dims, desc);
+      if (searching && folder?.label) {
+        const where = document.createElement("span");
+        where.className = "item-folder";
+        where.textContent = folder.label;
+        copy.append(where);
+      }
+      btn.append(thumb, copy);
+      catalogThumbUrl(item).then((url) => {
+        if (url && thumb.isConnected) thumb.src = url;
+      });
+      btn.addEventListener("click", () => {
+        if (!item.placeable) return;
+        // Replace at current position immediately
+        if (state.selectionAction === "replace" && selection?.getSelected()) {
+          const object = selection.getSelected();
+          const pose = {
+            position: {
+              x: object.position.x,
+              y: object.position.y,
+              z: object.position.z,
+            },
+            rotation: {
+              x: object.rotation.x,
+              y: object.rotation.y,
+              z: object.rotation.z,
+            },
+            parent: object.parent,
+            mount: object.userData?.placement?.mount,
+            face: object.userData?.placement?.face,
+            teIndex: object.userData?.placement?.teIndex,
+            abutting: object.userData?.placement?.abutting,
+            feedback: object.userData?.placement?.feedback || "gleiche Position",
+          };
+          import("../models/factories.js").then(({ createFromFactory }) => {
+            const opts =
+              item.factory === "controlStation"
+                ? { slots: state.stationSlots }
+                : item.factory === "rcbo1p"
+                  ? { spec: state.rcboSpec }
+                  : item.factory === "mcb1p" || item.factory === "mcb3p"
+                    ? { spec: state.mcbSpec }
+                    : item.factory === "rcd4p"
+                      ? { spec: state.rcdSpec }
+                      : {};
+            const next = createFromFactory(item.factory, opts);
+            if (!next) return;
+            selection.applyMoveOrReplace(pose, next, item);
+          });
+          return;
+        }
+        setState({
+          selectedCatalogId: item.id,
+          selectionAction: null,
+        });
+      });
+      section.appendChild(btn);
+    }
+    return section;
+  }
 
   function renderLibrary() {
     const catalog = getCatalog();
@@ -486,6 +579,9 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     const ranked = rankCatalogItems(catalog.items, query);
     const scoreOf = new Map(ranked.map((entry) => [entry.item.id, entry.score]));
     const searching = query.trim().length > 0;
+    libraryBody.querySelectorAll(".library-folder").forEach((el) => {
+      folderOpen.set(el.dataset.folder, el.open);
+    });
     libraryBody.classList.toggle("tiles", libraryView === "tiles");
     libraryBody.innerHTML = "";
     if (searching && !ranked.length) {
@@ -495,91 +591,31 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       libraryBody.appendChild(empty);
       return;
     }
-    for (const group of catalog.groups) {
-      let items = group.items.filter((item) => !searching || scoreOf.has(item.id));
-      if (!items.length) continue;
-      if (searching) items = items.slice().sort((a, b) => scoreOf.get(b.id) - scoreOf.get(a.id));
-      const section = document.createElement("section");
-      section.className = "library-group";
-      const title = document.createElement("h3");
-      title.className = "library-group-title";
-      title.textContent = group.label;
-      section.appendChild(title);
-
-      for (const item of items) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "catalog-item";
-        btn.dataset.catalogId = item.id;
-        btn.disabled = !item.placeable;
-        btn.title = libraryView === "tiles" ? "" : item.description || "";
-        const thumb = document.createElement("img");
-        thumb.className = "item-thumb";
-        thumb.alt = "";
-        const copy = document.createElement("span");
-        copy.className = "item-copy";
-        const label = document.createElement("span");
-        label.className = "item-label";
-        label.textContent = item.label;
-        const dims = document.createElement("span");
-        dims.className = "item-dims";
-        dims.textContent = `${formatItemDims(item)}${item.placeable ? "" : " · folgt"}`;
-        const desc = document.createElement("span");
-        desc.className = "item-desc";
-        desc.textContent = item.description || "";
-        copy.append(label, dims, desc);
-        btn.append(thumb, copy);
-        catalogThumbUrl(item).then((url) => {
-          if (url && thumb.isConnected) thumb.src = url;
-        });
-        btn.addEventListener("click", () => {
-          if (!item.placeable) return;
-          // Replace at current position immediately
-          if (state.selectionAction === "replace" && selection?.getSelected()) {
-            const object = selection.getSelected();
-            const pose = {
-              position: {
-                x: object.position.x,
-                y: object.position.y,
-                z: object.position.z,
-              },
-              rotation: {
-                x: object.rotation.x,
-                y: object.rotation.y,
-                z: object.rotation.z,
-              },
-              parent: object.parent,
-              mount: object.userData?.placement?.mount,
-              face: object.userData?.placement?.face,
-              teIndex: object.userData?.placement?.teIndex,
-              abutting: object.userData?.placement?.abutting,
-              feedback: object.userData?.placement?.feedback || "gleiche Position",
-            };
-            import("../models/factories.js").then(({ createFromFactory }) => {
-              const opts =
-                item.factory === "controlStation"
-                  ? { slots: state.stationSlots }
-                  : item.factory === "rcbo1p"
-                    ? { spec: state.rcboSpec }
-                    : item.factory === "mcb1p" || item.factory === "mcb3p"
-                      ? { spec: state.mcbSpec }
-                      : item.factory === "rcd4p"
-                        ? { spec: state.rcdSpec }
-                        : {};
-              const next = createFromFactory(item.factory, opts);
-              if (!next) return;
-              selection.applyMoveOrReplace(pose, next, item);
-            });
-            return;
-          }
-          setState({
-            selectedCatalogId: item.id,
-            selectionAction: null,
-          });
-        });
-        section.appendChild(btn);
+    const folders = catalog.folders?.length
+      ? catalog.folders
+      : [{ id: "alle", label: "", groups: catalog.groups }];
+    for (const folder of folders) {
+      const sections = [];
+      for (const group of folder.groups || []) {
+        let items = group.items.filter((item) => !searching || scoreOf.has(item.id));
+        if (!items.length) continue;
+        if (searching) items = items.slice().sort((a, b) => scoreOf.get(b.id) - scoreOf.get(a.id));
+        sections.push(renderLibraryGroup(group, items, folder, searching));
       }
-      libraryBody.appendChild(section);
+      if (!sections.length) continue;
+      const folderEl = document.createElement("details");
+      folderEl.className = "library-folder";
+      folderEl.dataset.folder = folder.id;
+      folderEl.open = searching || folderOpen.get(folder.id) !== false;
+      const summary = document.createElement("summary");
+      summary.className = "library-folder-title";
+      summary.textContent = folder.label;
+      folderEl.appendChild(summary);
+      const body = document.createElement("div");
+      body.className = "library-folder-body";
+      for (const section of sections) body.appendChild(section);
+      folderEl.appendChild(body);
+      libraryBody.appendChild(folderEl);
     }
     const active = state.selectedCatalogId;
     if (active) {
