@@ -58,7 +58,7 @@ export const CATALOG_ITEMS = [
     group: "schutzorgane",
     label: "FI-Schutzschalter 4P",
     short: "FI 4P",
-    description: "Fehlerstrom-Schutzschalter 40 A / 30 mA · 4 TE",
+    description: "4-polig · 4 TE · Prüftaste · Strom, Fehlerstrom und Typ wählbar, Aufdruck auf der Front",
     mount: "din",
     te: 4,
     widthMm: 72,

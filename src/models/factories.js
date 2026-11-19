@@ -75,7 +75,8 @@ export function createGhostFromFactory(factoryName, opts = {}) {
     factoryName === "controlStation" ||
     factoryName === "rcbo1p" ||
     factoryName === "mcb1p" ||
-    factoryName === "mcb3p"
+    factoryName === "mcb3p" ||
+    factoryName === "rcd4p"
   ) {
     return object;
   }

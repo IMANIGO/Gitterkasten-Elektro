@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { getCatalogItem, itemDepthM, itemWidthM } from "../catalog/index.js";
 import { createFromFactory, createGhostFromFactory } from "../models/factories.js";
 import { mcbSpecKey } from "../models/mcbSpec.js";
+import { rcdSpecKey } from "../models/rcdSpec.js";
 import { rcboSpecKey } from "../models/rcboSpec.js";
 import { setState, state } from "../state.js";
 import { poseOnDinRail, poseOnLochblech } from "./snap.js";
@@ -53,6 +54,7 @@ export function createPlacementController({
     if (item?.factory === "controlStation") return { slots: state.stationSlots };
     if (item?.factory === "rcbo1p") return { spec: state.rcboSpec };
     if (item?.factory === "mcb1p" || item?.factory === "mcb3p") return { spec: state.mcbSpec };
+    if (item?.factory === "rcd4p") return { spec: state.rcdSpec };
     return {};
   }
 
@@ -60,6 +62,7 @@ export function createPlacementController({
     if (item?.factory === "controlStation") return (state.stationSlots || []).join(",");
     if (item?.factory === "rcbo1p") return rcboSpecKey(state.rcboSpec);
     if (item?.factory === "mcb1p" || item?.factory === "mcb3p") return mcbSpecKey(state.mcbSpec);
+    if (item?.factory === "rcd4p") return rcdSpecKey(state.rcdSpec);
     return "";
   }
 

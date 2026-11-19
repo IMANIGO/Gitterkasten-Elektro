@@ -11,6 +11,14 @@ import {
   normalizeMcbSpec,
 } from "./mcbSpec.js";
 import {
+  applyRcdSpec,
+  formatRcdMeta,
+  formatRcdPrint,
+  makeRcdPlate,
+  makeTestButton,
+  normalizeRcdSpec,
+} from "./rcdSpec.js";
+import {
   applyRcboSpec,
   formatRcboMeta,
   formatRcboPrint,
@@ -18,7 +26,7 @@ import {
   normalizeRcboSpec,
 } from "./rcboSpec.js";
 
-export { applyRcboSpec, applyMcbSpec };
+export { applyRcboSpec, applyMcbSpec, applyRcdSpec };
 
 function mesh(geo, mat) {
   const m = new THREE.Mesh(geo, mat);
@@ -58,7 +66,7 @@ export function createDinDevice({
   const root = new THREE.Group();
   root.name = name;
 
-  if (ghost && variant !== "rcbo" && variant !== "mcb") {
+  if (ghost && variant !== "rcbo" && variant !== "mcb" && variant !== "rcd") {
     const body = mesh(
       new THREE.BoxGeometry(width - 0.2 * MM, height, depth),
       materials.ghost.clone(),
@@ -70,7 +78,7 @@ export function createDinDevice({
   }
 
   if (variant === "rcd") {
-    buildRcdBody(root, { width, height, depth, levers, label });
+    buildRcdBody(root, { width, height, depth, spec, ghost });
   } else if (variant === "rcbo") {
     buildRcboBody(root, { width, height, depth, spec, ghost });
   } else {
@@ -84,6 +92,7 @@ export function createDinDevice({
   }
   const fitted = variant === "rcbo" ? normalizeRcboSpec(spec) : null;
   const fittedMcb = variant === "mcb" ? normalizeMcbSpec(spec) : null;
+  const fittedRcd = variant === "rcd" ? normalizeRcdSpec(spec) : null;
   root.userData = {
     pickable: true,
     selectable: true,
@@ -93,13 +102,22 @@ export function createDinDevice({
       ? `FI/LS ${formatRcboPrint(fitted)}`
       : fittedMcb
         ? `LS ${levers}P ${formatMcbPrint(fittedMcb)}`
-        : name,
-    meta: fitted ? formatRcboMeta(fitted) : fittedMcb ? formatMcbMeta(fittedMcb, levers) : meta,
+        : fittedRcd
+          ? `FI 4P ${formatRcdPrint(fittedRcd)}`
+          : name,
+    meta: fitted
+      ? formatRcboMeta(fitted)
+      : fittedMcb
+        ? formatMcbMeta(fittedMcb, levers)
+        : fittedRcd
+          ? formatRcdMeta(fittedRcd)
+          : meta,
     kind: "dinDevice",
     te,
     widthMm: toMm(width),
     ...(fitted ? { rcboSpec: fitted } : {}),
     ...(fittedMcb ? { mcbSpec: fittedMcb, poles: levers } : {}),
+    ...(fittedRcd ? { rcdSpec: fittedRcd, poles: 4 } : {}),
   };
   return root;
 }
@@ -192,65 +210,78 @@ function buildMcbBody(root, { width, height, depth, levers, spec, ghost }) {
   root.add(plate);
 }
 
-/** FI: cooler grey-blue body, wide dual paddle, prominent test button, N-blue stripe. */
-function buildRcdBody(root, { width, height, depth, levers, label }) {
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0xd2e0ec,
-    roughness: 0.4,
-    metalness: 0.06,
+/**
+ * FI 4P. Kühles Graugehäuse, eine Klemme je Pol, blaue Schaltwippe innerhalb
+ * der Breite, runde Prüftaste T, Aufdruck von Strom, Fehlerstrom und Typ.
+ * Bewusst ohne die roten Kennzeichen und den überstehenden schwarzen Griff
+ * der gezeigten Leitungsschutz-Form, damit keine Marke mitschwingt.
+ */
+function buildRcdBody(root, { width, height, depth, spec, ghost }) {
+  const poles = 4;
+  const shell = ghost
+    ? materials.ghost.clone()
+    : new THREE.MeshStandardMaterial({ color: 0xcfd6de, roughness: 0.5, metalness: 0.08 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2c3338, roughness: 0.5, metalness: 0.22 });
+  const seamMat = new THREE.MeshStandardMaterial({ color: 0xb7c0c8, roughness: 0.48, metalness: 0.05 });
+  const blue = new THREE.MeshStandardMaterial({ color: 0x2a6cb0, roughness: 0.38, metalness: 0.1 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0xc5d7e6,
+    roughness: 0.2,
+    metalness: 0.04,
+    transparent: true,
+    opacity: ghost ? 0.25 : 0.7,
   });
-  const body = mesh(new THREE.BoxGeometry(width - 0.2 * MM, height, depth * 0.95), bodyMat);
-  body.position.set(0, height / 2, depth / 2 - 23 * MM);
+
+  const bodyD = depth * 0.78;
+  const bodyZ = depth / 2 - 26 * MM;
+  const body = mesh(new THREE.BoxGeometry(width - 0.3 * MM, height - 1.5 * MM, bodyD), shell);
+  body.position.set(0, height / 2, bodyZ);
   root.add(body);
+  const frontZ = bodyZ + bodyD / 2;
 
-  // Blue N marker band on side
-  const band = mesh(
-    new THREE.BoxGeometry(2.5 * MM, height * 0.7, depth * 0.5),
-    materials.terminalBlue,
-  );
-  band.position.set(-width / 2 + 1.5 * MM, height * 0.45, depth / 2 - 28 * MM);
-  root.add(band);
+  const hood = mesh(new THREE.BoxGeometry(width - 0.8 * MM, 14 * MM, 16 * MM), shell);
+  hood.position.set(0, height - 9 * MM, frontZ - 5 * MM);
+  root.add(hood);
 
-  // Dual / linked paddle
-  const paddleW = width - 8 * MM;
-  const paddle = mesh(
-    new THREE.BoxGeometry(paddleW, 16 * MM, 11 * MM),
-    materials.lever,
-  );
-  paddle.position.set(0, height - 14 * MM, depth / 2 - 13 * MM);
-  root.add(paddle);
-  for (let i = 0; i < Math.min(levers, 2); i++) {
-    const knob = mesh(
-      new THREE.BoxGeometry(paddleW * 0.35, 8 * MM, 4 * MM),
-      new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.4, metalness: 0.05 }),
-    );
-    knob.position.set((i === 0 ? -1 : 1) * paddleW * 0.22, height - 14 * MM, depth / 2 - 7 * MM);
-    root.add(knob);
+  for (let i = 1; i < poles; i++) {
+    const x = -width / 2 + (width / poles) * i;
+    const seam = mesh(new THREE.BoxGeometry(0.4 * MM, height * 0.88, 1 * MM), seamMat);
+    seam.position.set(x, height * 0.48, frontZ + 0.35 * MM);
+    root.add(seam);
   }
 
-  // Test button (T) — recessed yellow/red
-  const testWell = mesh(
-    new THREE.CylinderGeometry(6 * MM, 6 * MM, 2 * MM, 16),
-    materials.plasticBlack,
-  );
-  testWell.rotation.x = Math.PI / 2;
-  testWell.position.set(width / 2 - 12 * MM, height * 0.38, depth / 2 - 20 * MM);
-  root.add(testWell);
-  const testBtn = mesh(
-    new THREE.CylinderGeometry(4.5 * MM, 4.5 * MM, 3.5 * MM, 16),
-    new THREE.MeshStandardMaterial({ color: 0xe6b800, roughness: 0.35, metalness: 0.08 }),
-  );
-  testBtn.rotation.x = Math.PI / 2;
-  testBtn.position.set(width / 2 - 12 * MM, height * 0.38, depth / 2 - 18.5 * MM);
-  root.add(testBtn);
+  for (let i = 0; i < poles; i++) {
+    const x = -width / 2 + (width / poles) * (i + 0.5);
+    const topHole = mesh(new THREE.CylinderGeometry(2.4 * MM, 2.4 * MM, 2.4 * MM, 16), dark);
+    topHole.position.set(x, height - 1.2 * MM, frontZ - 8 * MM);
+    root.add(topHole);
+    const bottomHole = mesh(new THREE.CylinderGeometry(2.1 * MM, 2.1 * MM, 2.2 * MM, 16), dark);
+    bottomHole.position.set(x, 2 * MM, frontZ - 10 * MM);
+    root.add(bottomHole);
+  }
 
-  const plate = makeTextPlate(label, Math.min(toMm(width) - 4, 56), 9, {
-    bg: "#1a3a55",
-    fg: "#e8f2fa",
-    size: 42,
-  });
-  plate.position.set(-4 * MM, height * 0.55, depth / 2 - 19.5 * MM);
+  const rim = mesh(new THREE.BoxGeometry(width - 8 * MM, 8 * MM, 1 * MM), dark);
+  rim.position.set(0, height * 0.72, frontZ + 0.2 * MM);
+  root.add(rim);
+  const win = mesh(new THREE.BoxGeometry(width - 10 * MM, 6 * MM, 1.4 * MM), glass);
+  win.position.set(0, height * 0.72, frontZ + 0.9 * MM);
+  root.add(win);
+
+  const lever = mesh(new THREE.BoxGeometry(width - 10 * MM, 6 * MM, 5.5 * MM), blue);
+  lever.position.set(0, height * 0.58, frontZ + 2.2 * MM);
+  root.add(lever);
+
+  const plate = makeRcdPlate(spec);
+  plate.position.set(-8 * MM, height * 0.32, frontZ + 1.2 * MM);
   root.add(plate);
+
+  const test = makeTestButton();
+  test.position.set(width / 2 - 12 * MM, height * 0.34, frontZ + 1.6 * MM);
+  root.add(test);
+
+  const nMark = makeTextPlate("N", 6, 4, { bg: "#2a6cb0", fg: "#f4f8fb", size: 72 });
+  nMark.position.set(width / 2 - 8 * MM, height * 0.5, frontZ + 1.1 * MM);
+  root.add(nMark);
 }
 
 /**
@@ -355,15 +386,17 @@ export function createMcb3p(opts = {}) {
 }
 
 export function createRcd4p(opts = {}) {
+  const spec = normalizeRcdSpec(opts.spec || opts);
   return createDinDevice({
     te: 4,
-    label: "FI 30mA",
+    label: formatRcdPrint(spec),
     id: "fi-4p",
-    name: "FI-Schutzschalter 4P",
-    meta: "4 TE · 72 × 90 × 70 mm · 40 A / 30 mA",
-    levers: 2,
+    name: `FI 4P ${formatRcdPrint(spec)}`,
+    meta: formatRcdMeta(spec),
+    levers: 4,
     variant: "rcd",
-    ...opts,
+    spec,
+    ghost: !!opts.ghost,
   });
 }
 
