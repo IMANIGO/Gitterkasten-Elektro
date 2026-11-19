@@ -1,6 +1,7 @@
 import { EBOX, EBOX_FLOOR_Y, PANEL_INNER } from "../layout.js";
 import { MM } from "../units.js";
 import { getCatalogItem, itemDepthM } from "../catalog/index.js";
+import { lochblechStandoff } from "../placement/snap.js";
 
 const CM = 10 * MM;
 
@@ -11,7 +12,10 @@ const CM = 10 * MM;
 export function poseFromPlanPlacement(placement) {
   const item = getCatalogItem(placement.catalogId);
   const depth = item ? itemDepthM(item) : 45 * MM;
-  const standoff = Math.max(depth / 2, 4 * MM);
+  const standoff = lochblechStandoff(depth, {
+    catalogId: item?.id || placement.catalogId,
+    factory: item?.factory,
+  });
   const T = EBOX.panelThickness;
   const face = placement.face;
 

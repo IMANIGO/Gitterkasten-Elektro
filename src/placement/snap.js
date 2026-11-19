@@ -74,11 +74,48 @@ function faceLabel(face) {
 }
 
 /**
+ * Gap that keeps a back-face mesh (local z = 0) off the Lochblech.
+ * One millimetre avoids z-fighting without a visible float.
+ */
+export const LOCHBLECH_FLUSH_GAP = MM;
+
+/**
+ * Unterverteilung only: the housing is centered, so the back face is at
+ * local z = -depth/2. Other Lochblech devices are seated as back-face
+ * meshes (local z = 0).
+ */
+export function isCenteredDistributionBoard(hint = {}, depthM) {
+  if (
+    hint.catalogId === "uv-3reihen" ||
+    hint.factory === "distributionBoard" ||
+    hint.kind === "distributionBoard"
+  ) {
+    return true;
+  }
+  if (hint.catalogId || hint.factory || hint.kind) return false;
+  // Measure placement still forwards only a depth. That depth is unique to the UV.
+  if (typeof depthM !== "number") return false;
+  return Math.round(depthM / MM) === Math.round(UV.outerD / MM);
+}
+
+/**
+ * Offset from the panel face to the mesh origin.
+ * Back-face devices sit on LOCHBLECH_FLUSH_GAP. The centered UV keeps depth/2
+ * so its back lands on the panel instead of sinking or floating an extra half.
+ */
+export function lochblechStandoff(depthM, hint = {}) {
+  if (isCenteredDistributionBoard(hint, depthM)) return depthM / 2;
+  return LOCHBLECH_FLUSH_GAP;
+}
+
+/**
  * Place a Lochblech-mounted object so its back sits on the face.
  * Object local: +Z is "front"/open; footprint centered on XY.
+ * Pass catalogId, factory, or kind when known. Without them, a depth equal
+ * to the UV catalog depth still selects the centered housing.
  */
-export function poseOnLochblech(face, hitPoint, itemDepthM, { exact = false } = {}) {
-  const standoff = Math.max(itemDepthM / 2, 2 * MM);
+export function poseOnLochblech(face, hitPoint, itemDepthM, { exact = false, catalogId, factory, kind } = {}) {
+  const standoff = lochblechStandoff(itemDepthM, { catalogId, factory, kind });
   const T = EBOX.panelThickness;
   const use = (value, origin) => (exact ? value : snapToGrid(value, origin));
 

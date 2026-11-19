@@ -152,7 +152,12 @@ export function createPlacementController({
       if (!mount || mount.userData.mount !== "lochblech") continue;
       const face = mount.userData.face;
       if (!face) continue;
-      return poseOnLochblech(face, hit.point, itemDepthM(item), { exact });
+      return poseOnLochblech(face, hit.point, itemDepthM(item), {
+        exact,
+        catalogId: item.id,
+        factory: item.factory,
+        kind: item.kind,
+      });
     }
     return null;
   }
