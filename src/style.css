@@ -394,6 +394,32 @@ button:disabled {
   line-height: 1.4;
 }
 
+.cover-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: rgba(242, 240, 234, 0.06);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cover-toggle:hover {
+  background: rgba(242, 240, 234, 0.12);
+}
+
+.cover-toggle[hidden] {
+  display: none !important;
+}
+
+.cover-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .selection-actions {
   display: flex;
   flex-wrap: wrap;

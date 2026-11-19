@@ -224,7 +224,18 @@ function createCover(rowCenters) {
     g.add(strip);
   }
   g.position.z = UV.outerD / 2 - 8 * MM;
+  g.visible = false;
   return noRay(g);
+}
+
+/** Geräteabdeckung ein- oder ausblenden. Das Netz bleibt erhalten, Strahlprüfung bleibt aus. */
+export function setDistributionCoverVisible(root, visible) {
+  if (!root?.userData) return false;
+  const on = visible === true;
+  const cover = root.getObjectByName("Geraeteabdeckung");
+  if (cover) cover.visible = on;
+  root.userData.coverVisible = on;
+  return on;
 }
 
 function createDoor() {
@@ -362,9 +373,11 @@ export function createDistributionBoard({
     const field = createQcField(UV.railLength + 20 * MM);
     field.position.set(0, innerH / 2 - 42 * MM, innerBack + 16 * MM);
     root.add(field);
-    root.add(createCover(rowCenters));
     root.add(createDoor());
   }
+
+  const cover = createCover(rowCenters);
+  root.add(cover);
 
   const rows = [];
   for (let row = 0; row < UV.rows; row++) {
@@ -449,6 +462,8 @@ export function createDistributionBoard({
     height: UV.outerH,
     depth: UV.outerD,
   };
+  root.userData.coverVisible = false;
+  cover.visible = root.userData.coverVisible === true;
 
   return root;
 }

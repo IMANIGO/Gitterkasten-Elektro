@@ -9,6 +9,7 @@ import { rankCatalogItems } from "../catalog/search.js";
 import { catalogThumbUrl } from "../catalog/thumbnails.js";
 import * as THREE from "three";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
+import { setDistributionCoverVisible } from "../models/distributionBoard.js";
 import {
   MEASURE_FACES,
   dinMeasureFromLocal,
@@ -65,6 +66,8 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const selectionCard = document.getElementById("selection-card");
   const selectionName = document.getElementById("selection-name");
   const selectionDims = document.getElementById("selection-dims");
+  const coverToggle = document.getElementById("cover-toggle");
+  const coverVisibleInput = document.getElementById("cover-visible");
   const takeoffCard = document.getElementById("takeoff-card");
   const takeoffSummary = document.getElementById("takeoff-summary");
   const takeoffList = document.getElementById("takeoff-list");
@@ -639,6 +642,21 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     selection?.beginMove?.();
     document.getElementById("move-a")?.focus();
   });
+  coverVisibleInput?.addEventListener("change", () => {
+    const object = selection?.getSelected?.();
+    if (object?.userData?.kind !== "distributionBoard") return;
+    setDistributionCoverVisible(object, coverVisibleInput.checked);
+  });
+
+  function syncCoverToggle() {
+    const object = selection?.getSelected?.();
+    const isUv = object?.userData?.kind === "distributionBoard";
+    if (coverToggle) coverToggle.hidden = !isUv;
+    if (!isUv || !coverVisibleInput) return;
+    const on = object.userData.coverVisible === true;
+    setDistributionCoverVisible(object, on);
+    coverVisibleInput.checked = on;
+  }
 
   const measurePlace = document.getElementById("measure-place");
   const moveForm = document.getElementById("measure-move");
@@ -929,6 +947,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       statusMode.textContent = `Modus: ${MODE_LABELS[next.mode] || next.mode}`;
     }
 
+    syncCoverToggle();
     syncStationSetup(next);
     syncStationEdit(next);
     syncRcboSetup(next);
