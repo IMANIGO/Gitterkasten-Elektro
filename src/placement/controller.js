@@ -251,12 +251,17 @@ export function createPlacementController({
     }
 
     if (moving) {
+      if (selection.dragMoved?.() || selection.suppressClickMove?.()) {
+        clearGhost();
+        return;
+      }
       const selected = selection.getSelected();
       const item = getCatalogItem(selected.userData?.catalogId);
       if (!item?.placeable) return;
       const pose = resolvePose(item, hitsFromEvent(event, selected), { exact: true });
       if (!pose) return;
       selection.moveToPose(pose);
+      selection.keepSelectionAfterClick?.();
       clearGhost();
       return;
     }
@@ -269,7 +274,12 @@ export function createPlacementController({
 
     // Move existing selection
     if (state.selectionAction === "move" && selection?.getSelected()) {
+      if (selection.dragMoved?.() || selection.suppressClickMove?.()) {
+        clearGhost();
+        return;
+      }
       selection.moveToPose(pose);
+      selection.keepSelectionAfterClick?.();
       clearGhost();
       return;
     }

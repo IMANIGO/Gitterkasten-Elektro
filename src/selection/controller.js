@@ -113,6 +113,10 @@ export function createSelectionController({
   let selected = null;
   let downPos = null;
   let drag = null;
+  /** Click on another Betriebsmittel must not also relocate the one being moved. */
+  let suppressClickMove = false;
+  /** Set when a click (not a drag) already relocated the selection, so the empty click keeps it. */
+  let keepSelectionOnEmptyClick = false;
 
   function clearSelection() {
     setSelectedHighlight(selected, false);
@@ -176,6 +180,7 @@ export function createSelectionController({
   function onDown(event) {
     if (event.button !== 0) return;
     downPos = { x: event.clientX, y: event.clientY };
+    suppressClickMove = false;
     if (
       state.mode !== "betriebsmittel" &&
       state.mode !== "ansicht" &&
@@ -183,12 +188,18 @@ export function createSelectionController({
     ) {
       return;
     }
+    // A catalog ghost owns the press: first placement stays click-to-place.
     if (state.selectedCatalogId && state.selectionAction !== "move") return;
     const hit = pickPlaced(event);
     if (!hit?.userData?.catalogId) return;
-    if (selected !== hit) selectObject(hit);
-    drag = { object: hit, moved: false };
-    if (controls) controls.enabled = false;
+    // Drag only the already selected device, and only after Verschieben.
+    if (state.selectionAction === "move" && hit === selected) {
+      drag = { object: hit, moved: false };
+      if (controls) controls.enabled = false;
+      event.stopPropagation();
+      return;
+    }
+    suppressClickMove = true;
     event.stopPropagation();
   }
 
@@ -209,17 +220,24 @@ export function createSelectionController({
     if (downPos) {
       const dragged = Math.hypot(event.clientX - downPos.x, event.clientY - downPos.y) > 8;
       downPos = null;
-      if (dragged) return;
+      if (dragged) {
+        keepSelectionOnEmptyClick = false;
+        return;
+      }
     }
 
+    const keep = keepSelectionOnEmptyClick;
+    keepSelectionOnEmptyClick = false;
     const hit = pickPlaced(event);
     if (hit) {
       selectObject(hit);
-      if (state.selectionAction === "move" && placement) {
-        // Move is handled by placement re-pose — keep selected and wait for place
-      }
+    } else if (keep) {
+      // Klick hat das gewählte Bauteil schon versetzt; Auswahl behalten.
     } else if (state.selectionAction === "move") {
-      // Leerfläche neu anklicken verschiebt, Auswahl bleibt.
+      setState({
+        selectionAction: null,
+        placementFeedback: "Verschieben abgebrochen",
+      });
     } else if (state.mode === "ansicht" || !state.selectedCatalogId) {
       clearSelection();
     }
@@ -246,7 +264,7 @@ export function createSelectionController({
     setState({
       selectedPositionText: formatPosition(selected),
       placementFeedback: `Verschoben · ${pose.feedback}`,
-      selectionAction: "move",
+      selectionAction: null,
     });
     return true;
   }
@@ -287,6 +305,7 @@ export function createSelectionController({
       setState({
         selectedPositionText: formatPosition(selected),
         placementFeedback: `Verschoben · ${selected.userData?.placement?.feedback || "exakt"}`,
+        selectionAction: null,
       });
     }
   }
@@ -404,6 +423,9 @@ export function createSelectionController({
       event.preventDefault();
       deleteSelected();
     } else if (event.key === "Escape") {
+      drag = null;
+      suppressClickMove = false;
+      if (controls) controls.enabled = true;
       clearSelection();
       setState({ selectedCatalogId: null, selectionAction: null });
     }
@@ -425,6 +447,11 @@ export function createSelectionController({
     applyMoveOrReplace,
     moveToPose,
     placeFresh,
+    dragMoved: () => Boolean(drag?.moved),
+    suppressClickMove: () => suppressClickMove,
+    keepSelectionAfterClick() {
+      keepSelectionOnEmptyClick = true;
+    },
     listDinRails: () => placement?.listDinRails?.() || [],
     refreshPositionText() {
       if (selected) {
