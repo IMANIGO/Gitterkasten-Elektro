@@ -1,4 +1,5 @@
 import { getCatalogItem } from "../catalog/index.js";
+import { symbolForCatalog } from "../catalog/symbols.js";
 import { formatCableSpec } from "../wiring/cableTypes.js";
 import { toMm } from "../units.js";
 import { coordsFromPlacedObject, defaultFacesCm } from "./planFromWorld.js";
@@ -12,6 +13,12 @@ const TAG_PREFIX = {
   "taster": "S",
   "schalter-aus": "S",
   "schalter-kreuz": "S",
+  "schalter-aus-2p": "S",
+  "schalter-serie": "S",
+  dimmer: "S",
+  "taster-leucht": "S",
+  stromstoss: "S",
+  daemmerung: "S",
   "serie-aus-aus": "S",
   "serie-wechsel-wechsel": "S",
   "serie-kreuz-wechsel": "S",
@@ -135,16 +142,7 @@ function buildCircuits(surface, wires) {
 }
 
 function symbolKey(id) {
-  if (!id) return "generic";
-  if (id === "taster" || id === "serie-taster-taster") return id.startsWith("serie") ? "serie" : "taster";
-  if (id.startsWith("serie")) return "serie";
-  if (id.includes("kreuz")) return "kreuz";
-  if (id === "schalter" || id.includes("wechsel")) return "wechsel";
-  if (id.includes("aus")) return "aus";
-  if (id.includes("steck") || id.startsWith("cee")) return "steck";
-  if (id.startsWith("uv")) return "uv";
-  if (id.startsWith("leuchte")) return "licht";
-  return "generic";
+  return symbolForCatalog(id);
 }
 
 function guessCableFor(catalogId) {

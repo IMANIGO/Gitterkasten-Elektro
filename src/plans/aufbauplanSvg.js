@@ -1,3 +1,5 @@
+import { symbolForCatalog, symbolSvg } from "../catalog/symbols.js";
+
 /**
  * Unfolded Aufbauplan as SVG (like the training sheet), driven by plan.placements.
  */
@@ -163,40 +165,25 @@ export function renderAufbauplanSvg(plan) {
   </svg>`;
 }
 
-function symbolForCatalog(id) {
-  if (!id) return "generic";
-  if (id.includes("tasterblock")) return "tasterblock";
-  if (id.includes("taster") && !id.includes("wechsel") && !id.includes("kreuz") && !id.includes("aus")) return "taster";
-  if (id.startsWith("serie")) return "serie";
-  if (id.includes("kreuz")) return "kreuz";
-  if (id.includes("wechsel") || id === "schalter") return "wechsel";
-  if (id.includes("aus")) return "aus";
-  if (id.includes("steck") || id.startsWith("cee")) return "steck";
-  if (id.startsWith("uv")) return "uv";
-  if (id.startsWith("leuchte")) return "licht";
-  if (id.includes("tasterblock")) return "tasterblock";
-  return "generic";
-}
-
 function legendGlyph(symbol, x, y) {
-  const s = 12;
-  if (symbol === "taster") {
-    return `<circle cx="${x}" cy="${y - 2}" r="5" fill="none" stroke="#111" stroke-width="1.2"/>
-      <line x1="${x}" y1="${y - 7}" x2="${x}" y2="${y - 12}" stroke="#111" stroke-width="1.2"/>`;
-  }
-  if (symbol === "kreuz") {
-    return `<line x1="${x - 5}" y1="${y - 8}" x2="${x + 5}" y2="${y + 2}" stroke="#111" stroke-width="1.3"/>
-      <line x1="${x + 5}" y1="${y - 8}" x2="${x - 5}" y2="${y + 2}" stroke="#111" stroke-width="1.3"/>`;
-  }
-  if (symbol === "wechsel") {
-    return `<polyline points="${x - 6},${y} ${x - 1},${y} ${x + 6},${y - 8}" fill="none" stroke="#111" stroke-width="1.2"/>
-      <circle cx="${x + 6}" cy="${y - 8}" r="1.6" fill="#111"/>`;
-  }
-  if (symbol === "aus") {
-    return `<polyline points="${x - 6},${y + 2} ${x},${y + 2} ${x + 6},${y - 8}" fill="none" stroke="#111" stroke-width="1.2"/>`;
+  if (
+    symbol === "aus" ||
+    symbol === "aus2" ||
+    symbol === "wechsel" ||
+    symbol === "kreuz" ||
+    symbol === "serieV" ||
+    symbol === "dimmer" ||
+    symbol === "taster" ||
+    symbol === "taster-licht" ||
+    symbol === "stromstoss" ||
+    symbol === "daemmerung" ||
+    symbol === "lampe" ||
+    symbol === "dose"
+  ) {
+    return symbolSvg(symbol, x, y - 2, 16);
   }
   if (symbol === "serie") {
-    return `<rect x="${x - 7}" y="${y - 8}" width="${s}" height="10" fill="none" stroke="#111" stroke-width="1"/>
+    return `<rect x="${x - 7}" y="${y - 8}" width="12" height="10" fill="none" stroke="#111" stroke-width="1"/>
       <line x1="${x - 1}" y1="${y - 8}" x2="${x - 1}" y2="${y + 2}" stroke="#111" stroke-width="1"/>`;
   }
   if (symbol === "steck") {
@@ -204,9 +191,6 @@ function legendGlyph(symbol, x, y) {
   }
   if (symbol === "uv") {
     return `<rect x="${x - 6}" y="${y - 8}" width="12" height="10" fill="#d8dce0" stroke="#111" stroke-width="1"/>`;
-  }
-  if (symbol === "licht") {
-    return `<circle cx="${x}" cy="${y - 2}" r="5" fill="#f5f0c8" stroke="#111" stroke-width="1"/>`;
   }
   if (symbol === "tasterblock") {
     return [0, 1, 2, 3]

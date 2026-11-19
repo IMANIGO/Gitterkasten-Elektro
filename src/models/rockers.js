@@ -1,19 +1,38 @@
 import * as THREE from "three";
 import { materials } from "../materials.js";
 import { MM, toMm } from "../units.js";
+import { paintSymbol } from "../catalog/symbols.js";
 
 /**
  * AP-Wippen mit Schaltzeichen (markenneutral, keine Herstellerzeichen).
  * Einzelwippe 80×80, Serie (2-fach) 151×80 — auch gemischt Taster/Schalter.
+ * Zeichen: Kreis mit Stiel und Nase (Schalter), Doppelkreis (Taster).
  */
 
-export const ROCKER_SYMBOLS = ["aus", "wechsel", "kreuz", "taster"];
+export const ROCKER_SYMBOLS = [
+  "aus",
+  "aus2",
+  "wechsel",
+  "kreuz",
+  "serieV",
+  "dimmer",
+  "taster",
+  "taster-licht",
+  "stromstoss",
+  "daemmerung",
+];
 
 const SYMBOL_LABEL = {
   aus: "Aus",
+  aus2: "Aus 2p",
   wechsel: "Wechsel",
   kreuz: "Kreuz",
+  serieV: "Serie",
+  dimmer: "Dimmer",
   taster: "Taster",
+  "taster-licht": "Taster Licht",
+  stromstoss: "Stromstoß",
+  daemmerung: "Dämmerung",
 };
 
 function mesh(geo, mat) {
@@ -23,63 +42,12 @@ function mesh(geo, mat) {
   return m;
 }
 
-function drawSymbol(ctx, kind) {
-  ctx.strokeStyle = "#1c1c1c";
-  ctx.fillStyle = "#1c1c1c";
-  ctx.lineWidth = 14;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  if (kind === "taster") {
-    ctx.beginPath();
-    ctx.arc(128, 148, 46, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(128, 102);
-    ctx.lineTo(128, 40);
-    ctx.moveTo(108, 62);
-    ctx.lineTo(128, 40);
-    ctx.lineTo(148, 62);
-    ctx.stroke();
-  } else if (kind === "kreuz") {
-    ctx.beginPath();
-    ctx.moveTo(58, 58);
-    ctx.lineTo(198, 198);
-    ctx.moveTo(198, 58);
-    ctx.lineTo(58, 198);
-    ctx.stroke();
-  } else if (kind === "wechsel") {
-    ctx.beginPath();
-    ctx.moveTo(40, 128);
-    ctx.lineTo(108, 128);
-    ctx.moveTo(108, 128);
-    ctx.lineTo(188, 62);
-    ctx.moveTo(150, 128);
-    ctx.lineTo(196, 196);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(196, 58, 11, 0, Math.PI * 2);
-    ctx.arc(204, 200, 11, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(44, 168);
-    ctx.lineTo(112, 168);
-    ctx.lineTo(188, 72);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(200, 60, 14, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-}
-
 function symbolMaterial(kind, bg = "#f6f3ea") {
   const canvas = document.createElement("canvas");
   canvas.width = 256;
   canvas.height = 256;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, 256, 256);
-  drawSymbol(ctx, kind);
+  paintSymbol(ctx, kind, 256, bg);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
@@ -269,6 +237,66 @@ export function createPushbutton(opts = {}) {
     name: "AP-Taster",
     meta: "80 × 80 × 42 mm · Wippe · Tastersymbol",
     rockers: ["taster"],
+    ...opts,
+  });
+}
+
+export function createSwitchOff2(opts = {}) {
+  return createRockerDevice({
+    id: "schalter-aus-2p",
+    name: "AP-Ausschalter 2-polig",
+    meta: "80 × 80 × 42 mm · Wippe · Ausschalter zweipolig",
+    rockers: ["aus2"],
+    ...opts,
+  });
+}
+
+export function createSeriesSwitch(opts = {}) {
+  return createRockerDevice({
+    id: "schalter-serie",
+    name: "AP-Serienschalter",
+    meta: "80 × 80 × 42 mm · Wippe · Serienschalter",
+    rockers: ["serieV"],
+    ...opts,
+  });
+}
+
+export function createDimmer(opts = {}) {
+  return createRockerDevice({
+    id: "dimmer",
+    name: "AP-Dimmer",
+    meta: "80 × 80 × 42 mm · Wippe · Dimmer",
+    rockers: ["dimmer"],
+    ...opts,
+  });
+}
+
+export function createPushbuttonLamp(opts = {}) {
+  return createRockerDevice({
+    id: "taster-leucht",
+    name: "AP-Taster mit Leuchte",
+    meta: "80 × 80 × 42 mm · Wippe · Taster mit Leuchte",
+    rockers: ["taster-licht"],
+    ...opts,
+  });
+}
+
+export function createImpulseSwitch(opts = {}) {
+  return createRockerDevice({
+    id: "stromstoss",
+    name: "AP-Stromstoßschalter",
+    meta: "80 × 80 × 42 mm · Wippe · Stromstoßschalter",
+    rockers: ["stromstoss"],
+    ...opts,
+  });
+}
+
+export function createTwilightSwitch(opts = {}) {
+  return createRockerDevice({
+    id: "daemmerung",
+    name: "AP-Dämmerungsschalter",
+    meta: "80 × 80 × 42 mm · Wippe · Dämmerungsschalter",
+    rockers: ["daemmerung"],
     ...opts,
   });
 }

@@ -18,11 +18,17 @@ import {
 } from "./devices.js";
 import { createDistributionBoard } from "./distributionBoard.js";
 import {
+  createDimmer,
+  createImpulseSwitch,
   createPushbutton,
+  createPushbuttonLamp,
   createSeries,
+  createSeriesSwitch,
   createSwitch,
   createSwitchCross,
   createSwitchOff,
+  createSwitchOff2,
+  createTwilightSwitch,
 } from "./rockers.js";
 
 const FACTORIES = {
@@ -39,6 +45,12 @@ const FACTORIES = {
   outlet: createOutlet,
   switch: createSwitch,
   switchOff: createSwitchOff,
+  switchOff2: createSwitchOff2,
+  seriesSwitch: createSeriesSwitch,
+  dimmer: createDimmer,
+  pushbuttonLamp: createPushbuttonLamp,
+  impulseSwitch: createImpulseSwitch,
+  twilightSwitch: createTwilightSwitch,
   switchCross: createSwitchCross,
   pushbutton: createPushbutton,
   seriesAusAus: (opts) => createSeries("serie-aus-aus", "AP-Serie Aus + Aus", ["aus", "aus"], opts),
