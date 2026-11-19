@@ -501,6 +501,103 @@ export function createImpulseRelay({ ghost = false } = {}) {
   return root;
 }
 
+/**
+ * Leistungsschütz, 3 TE, drei Hauptkontakte und ein Hilfsschließer.
+ * Gleiche Gehäuse- und Kappenfarbe wie die übrigen Reiheneinbaugeräte,
+ * ohne Herstellerzeichen und ohne die typische Frontschieber-Form.
+ */
+export function createContactor({ ghost = false } = {}) {
+  const width = 3 * TE;
+  const height = 90 * MM;
+  const depth = 70 * MM;
+  const root = new THREE.Group();
+  root.name = "Leistungsschütz";
+
+  const shell = ghost
+    ? materials.ghost.clone()
+    : new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.45, metalness: 0.06 });
+  const capMat = ghost
+    ? materials.ghost.clone()
+    : new THREE.MeshStandardMaterial({ color: 0x3c433c, roughness: 0.46, metalness: 0.1 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1a1c1e, roughness: 0.4, metalness: 0.35 });
+  const wellMat = new THREE.MeshStandardMaterial({ color: 0x2a2e32, roughness: 0.5, metalness: 0.18 });
+  const barMat = new THREE.MeshStandardMaterial({ color: 0xc5ccd3, roughness: 0.4, metalness: 0.12 });
+  const slotMat = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.42, metalness: 0.04 });
+
+  const bodyD = 44 * MM;
+  const bodyZ = depth / 2 - 26 * MM;
+  const body = mesh(new THREE.BoxGeometry(width - 0.4 * MM, height - 1.2 * MM, bodyD), shell);
+  body.position.set(0, height / 2, bodyZ);
+  root.add(body);
+  const frontZ = bodyZ + bodyD / 2;
+
+  const capH = 16 * MM;
+  const capD = 13 * MM;
+  const holes = [-16, -2, 12, 22].map((value) => value * MM);
+  for (const top of [true, false]) {
+    const y = top ? height - capH / 2 - 0.4 * MM : capH / 2 + 0.4 * MM;
+    const cap = mesh(new THREE.BoxGeometry(width - 0.6 * MM, capH, capD), capMat);
+    cap.position.set(0, y, frontZ + capD / 2 - 1.5 * MM);
+    root.add(cap);
+    holes.forEach((x, index) => {
+      const radius = index === 3 ? 1.15 * MM : 1.65 * MM;
+      const hole = mesh(new THREE.CylinderGeometry(radius, radius, 1.5 * MM, 14), dark);
+      const faceY = top ? y + capH / 2 : y - capH / 2;
+      hole.position.set(x, faceY, frontZ + 4.5 * MM);
+      root.add(hole);
+      const slot = mesh(new THREE.BoxGeometry(radius * 1.55, 0.35 * MM, 0.4 * MM), slotMat);
+      slot.position.set(x, top ? faceY + 0.2 * MM : faceY - 0.2 * MM, frontZ + 4.5 * MM);
+      root.add(slot);
+    });
+  }
+
+  const seam = mesh(new THREE.BoxGeometry(0.45 * MM, height * 0.5, 0.7 * MM), wellMat);
+  seam.position.set(17 * MM, height * 0.5, frontZ + 0.25 * MM);
+  root.add(seam);
+
+  const well = mesh(new THREE.BoxGeometry(20 * MM, 24 * MM, 2 * MM), wellMat);
+  well.position.set(-6 * MM, height * 0.5, frontZ + 0.5 * MM);
+  root.add(well);
+  const bar = mesh(new THREE.BoxGeometry(12 * MM, 3.4 * MM, 2.2 * MM), barMat);
+  bar.position.set(-6 * MM, height * 0.52, frontZ + 1.5 * MM);
+  root.add(bar);
+
+  for (const x of [-5 * MM, 5 * MM]) {
+    const coil = mesh(new THREE.CylinderGeometry(1.25 * MM, 1.25 * MM, 2.4 * MM, 12), dark);
+    coil.rotation.x = Math.PI / 2;
+    coil.position.set(x, height * 0.73, frontZ + 1.1 * MM);
+    root.add(coil);
+  }
+
+  root.add(dinFoot(width - 1 * MM));
+  if (ghost) {
+    root.userData = { ghost: true };
+    return root;
+  }
+
+  const amps = makeTextPlate("23 A", 16, 6, { bg: "#f3f4f6", fg: "#2a2c28", size: 84 });
+  amps.position.set(12 * MM, height * 0.56, frontZ + 0.25 * MM);
+  const power = makeTextPlate("11 kW", 18, 5, { bg: "#f3f4f6", fg: "#2a2c28", size: 72 });
+  power.position.set(12 * MM, height * 0.46, frontZ + 0.25 * MM);
+  const coilLabel = makeTextPlate("24 V", 16, 5.5, { bg: "#f3f4f6", fg: "#2a2c28", size: 80 });
+  coilLabel.position.set(-2 * MM, height * 0.3, frontZ + 0.25 * MM);
+  root.add(amps, power, coilLabel);
+
+  root.userData = {
+    pickable: true,
+    selectable: true,
+    id: "schuetz-3p",
+    catalogId: "schuetz-3p",
+    name: "Leistungsschütz 3P",
+    meta: "3 TE · 3 Schließer · 23 A · 11 kW · Spule 24 V AC · 1 Hilfsschließer",
+    kind: "dinDevice",
+    te: 3,
+    widthMm: toMm(width),
+    symbol: "schuetz",
+  };
+  return root;
+}
+
 export function createRcbo1p(opts = {}) {
   const spec = normalizeRcboSpec(opts.spec || opts);
   return createDinDevice({

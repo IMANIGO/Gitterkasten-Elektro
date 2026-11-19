@@ -101,6 +101,22 @@ export function symbolOps(kind) {
       { op: "line", x1: 50 + r * 0.62, y1: 50 - r * 0.62, x2: 50 - r * 0.62, y2: 50 + r * 0.62 },
     ];
   }
+  if (kind === "schuetz") {
+    return [
+      { op: "line", x1: 8, y1: 64, x2: 34, y2: 64 },
+      { op: "line", x1: 34, y1: 64, x2: 74, y2: 26 },
+      { op: "line", x1: 74, y1: 26, x2: 92, y2: 26 },
+      {
+        op: "polygon",
+        pts: [
+          [24, 78],
+          [50, 78],
+          [37, 58],
+        ],
+        fill: true,
+      },
+    ];
+  }
   if (kind === "stromstoss") {
     return [
       { op: "rect", x: 14, y: 26, w: 72, h: 48 },
@@ -174,6 +190,12 @@ export function paintSymbol(ctx, kind, size = 256, bg = "#f6f3ea") {
       ctx.stroke();
     } else if (op.op === "rect") {
       ctx.strokeRect(op.x * s, op.y * s, op.w * s, op.h * s);
+    } else if (op.op === "polygon") {
+      ctx.beginPath();
+      op.pts.forEach((p, i) => (i ? ctx.lineTo(p[0] * s, p[1] * s) : ctx.moveTo(p[0] * s, p[1] * s)));
+      ctx.closePath();
+      if (op.fill) ctx.fill();
+      else ctx.stroke();
     } else if (op.op === "text") {
       ctx.font = `600 ${op.size * s}px sans-serif`;
       ctx.fillStyle = "#1c1c1c";
@@ -205,6 +227,11 @@ export function symbolSvg(kind, cx, cy, box = 16) {
       if (op.op === "rect") {
         return `<rect x="${X(op.x)}" y="${Y(op.y)}" width="${(op.w * s).toFixed(2)}" height="${(op.h * s).toFixed(2)}" fill="none" stroke="#111" stroke-width="1.1"/>`;
       }
+      if (op.op === "polygon") {
+        const pts = op.pts.map((p) => `${X(p[0])},${Y(p[1])}`).join(" ");
+        const fill = op.fill ? "#111" : "none";
+        return `<polygon points="${pts}" fill="${fill}" stroke="#111" stroke-width="1.1" stroke-linejoin="round"/>`;
+      }
       if (op.op === "text") {
         return `<text x="${X(op.x)}" y="${Y(op.y)}" text-anchor="middle" dominant-baseline="middle" font-size="${(op.size * s).toFixed(1)}" font-family="IBM Plex Sans, sans-serif" fill="#111">${op.text}</text>`;
       }
@@ -221,6 +248,7 @@ export function symbolForCatalog(id) {
   if (id === "schalter-serie") return "serieV";
   if (id === "dimmer") return "dimmer";
   if (id === "stromstoss" || id === "stromstoss-1te") return "stromstoss";
+  if (id === "schuetz-3p") return "schuetz";
   if (id === "daemmerung") return "daemmerung";
   if (id.includes("tasterblock")) return "tasterblock";
   if (id.includes("taster") && !id.includes("wechsel") && !id.includes("kreuz") && !id.includes("aus")) {

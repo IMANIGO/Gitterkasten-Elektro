@@ -19,6 +19,7 @@ const TAG_PREFIX = {
   "taster-leucht": "S",
   stromstoss: "S",
   "stromstoss-1te": "K",
+  "schuetz-3p": "K",
   daemmerung: "S",
   "serie-aus-aus": "S",
   "serie-wechsel-wechsel": "S",

@@ -176,6 +176,7 @@ function legendGlyph(symbol, x, y) {
     symbol === "taster" ||
     symbol === "taster-licht" ||
     symbol === "stromstoss" ||
+    symbol === "schuetz" ||
     symbol === "daemmerung" ||
     symbol === "lampe" ||
     symbol === "dose"
