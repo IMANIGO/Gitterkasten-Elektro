@@ -95,11 +95,12 @@
         <header class="library-head">
           <p class="kicker">Dokumentation</p>
           <h2>Pläne</h2>
-          <p class="library-hint">Aufbauplan anzeigen / laden und in 3D bauen · Stromlauf · Klemmenliste</p>
+          <p class="library-hint" id="plans-hint">Aufbauplan wird live aus dem 3D-Aufbau erzeugt · Stromlauf · Klemmenliste</p>
         </header>
         <div class="plans-toolbar">
           <select id="plan-select"></select>
-          <button type="button" id="btn-build-plan">In 3D bauen</button>
+          <button type="button" id="btn-refresh-plan">Aktualisieren</button>
+          <button type="button" id="btn-build-plan">Vorlage in 3D bauen</button>
           <label class="file-btn">
             JSON laden
             <input type="file" id="plan-upload" accept="application/json,.json" hidden />

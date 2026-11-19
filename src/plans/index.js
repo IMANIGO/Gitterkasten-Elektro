@@ -1,10 +1,14 @@
 import { PLAN_M6_P01 } from "./m6-p01.js";
 import { buildPlanInScene } from "./builder.js";
+import { capturePlanFromScene } from "./captureFromScene.js";
 import { renderAufbauplanSvg } from "./aufbauplanSvg.js";
 import { renderStromlaufplanSvg } from "./stromlaufplanSvg.js";
 import { klemmenlisteToCsv, renderKlemmenlisteHtml } from "./klemmenliste.js";
 
+/** Example template only — live plan is generated from the 3D scene. */
 export const BUILTIN_PLANS = [PLAN_M6_P01];
+
+export { capturePlanFromScene };
 
 export function getPlan(id) {
   return BUILTIN_PLANS.find((p) => p.id === id) || null;

@@ -52,18 +52,50 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const planDocButtons = [...document.querySelectorAll("[data-plan-doc]")];
 
   let currentPlan = plansApi?.getActivePlan?.() || null;
+  let lastPlanSceneKey = "";
+  const plansHint = document.getElementById("plans-hint");
+  const btnBuildPlan = document.getElementById("btn-build-plan");
+  const btnRefreshPlan = document.getElementById("btn-refresh-plan");
 
   function fillPlanSelect() {
     if (!planSelect || !plansApi) return;
     const list = plansApi.listPlans();
     planSelect.innerHTML = list
-      .map((p) => `<option value="${p.id}">${p.planNr || p.id} — ${p.title}</option>`)
+      .map((p) => {
+        const label = p.live
+          ? `LIVE — Aufbauplan aus 3D-Szene`
+          : `${p.planNr || p.id} — ${p.title}${p.id === "m6-p01" ? " (Beispiel)" : ""}`;
+        return `<option value="${p.id}">${label}</option>`;
+      })
       .join("");
     if (currentPlan) planSelect.value = currentPlan.id;
   }
 
+  function syncPlanToolbar() {
+    const live = !!(currentPlan?.live || plansApi?.isLive?.());
+    if (btnBuildPlan) {
+      btnBuildPlan.disabled = live;
+      btnBuildPlan.title = live
+        ? "Live-Plan kommt aus der Szene — Vorlage wählen, um in 3D zu bauen"
+        : "Ausgewählte Vorlage in die 3D-Szene bauen";
+    }
+    if (btnRefreshPlan) {
+      btnRefreshPlan.hidden = !live && currentPlan?.id !== "live-aufbau";
+    }
+    if (plansHint) {
+      plansHint.textContent = live
+        ? "Aufbauplan / Stromlauf / Klemmenliste werden live aus dem aktuellen 3D-Aufbau erzeugt"
+        : "Beispielvorlage — „In 3D bauen“ oder zurück zu LIVE für den echten Aufbau";
+    }
+  }
+
   function renderPlanDoc() {
-    if (!planDoc || !currentPlan || !plansApi) return;
+    if (!planDoc || !plansApi) return;
+    // Always refresh live plan from scene when documenting
+    if (plansApi.isLive?.() || currentPlan?.id === "live-aufbau") {
+      currentPlan = plansApi.refreshLive?.() || plansApi.getActivePlan?.();
+    }
+    if (!currentPlan) return;
     const view = state.planDocView || "aufbau";
     if (view === "stromlauf") {
       planDoc.innerHTML = plansApi.renderStromlauf(currentPlan);
@@ -72,6 +104,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     } else {
       planDoc.innerHTML = plansApi.renderAufbau(currentPlan);
     }
+    syncPlanToolbar();
   }
 
   function setActivePlan(plan) {
@@ -269,7 +302,10 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   fillCableSelects();
   renderLibrary();
   fillPlanSelect();
-  if (plansApi?.listPlans()?.[0]) setActivePlan(plansApi.listPlans()[0]);
+  // Default: live plan from scene (not the example photo/template)
+  if (plansApi) {
+    setActivePlan(plansApi.getPlan("live-aufbau") || plansApi.getActivePlan());
+  }
 
   planSelect?.addEventListener("change", () => {
     const plan = plansApi.getPlan(planSelect.value);
@@ -284,17 +320,32 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     });
   });
 
-  document.getElementById("btn-build-plan")?.addEventListener("click", () => {
-    if (!currentPlan) return;
+  btnRefreshPlan?.addEventListener("click", () => {
+    currentPlan = plansApi.refreshLive?.() || plansApi.getActivePlan?.();
+    fillPlanSelect();
+    renderPlanDoc();
+    if (planFeedback) {
+      planFeedback.textContent = `Live-Plan aktualisiert · ${(currentPlan?.placements || []).length} Bauteile · ${(currentPlan?.wireRuns || []).length} Leitungen`;
+    }
+  });
+
+  btnBuildPlan?.addEventListener("click", () => {
+    if (!currentPlan || currentPlan.live) return;
     const result = plansApi.build(currentPlan);
     if (planFeedback) {
       planFeedback.textContent = `${result.placed} Bauteile gebaut${
         result.skipped.length ? ` · fehlt: ${result.skipped.join(", ")}` : ""
       }`;
     }
+    // After building a template, jump back to live view of the new scene
+    setActivePlan(plansApi.getPlan("live-aufbau"));
+    fillPlanSelect();
   });
 
   document.getElementById("btn-export-plan")?.addEventListener("click", () => {
+    if (plansApi.isLive?.()) {
+      currentPlan = plansApi.refreshLive?.() || currentPlan;
+    }
     if (!currentPlan) return;
     const blob = new Blob([plansApi.exportJson(currentPlan)], { type: "application/json" });
     const a = document.createElement("a");
@@ -332,7 +383,20 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     libraryPanel.hidden = !showLibrary;
     takeoffCard.hidden = next.mode !== "aufmass";
     cableForm.hidden = next.mode !== "verdrahtung";
-    if (plansPanel) plansPanel.hidden = next.mode !== "plaene";
+    if (plansPanel) {
+      const showPlans = next.mode === "plaene";
+      const wasHidden = plansPanel.hidden;
+      plansPanel.hidden = !showPlans;
+      const sceneKey = `${next.placedCount}|${next.wireCount}|${next.lastWireLengthMm}`;
+      if (showPlans && (wasHidden || sceneKey !== lastPlanSceneKey)) {
+        lastPlanSceneKey = sceneKey;
+        if (plansApi?.isLive?.() || currentPlan?.id === "live-aufbau") {
+          currentPlan = plansApi.refreshLive?.() || currentPlan;
+          fillPlanSelect();
+          renderPlanDoc();
+        }
+      }
+    }
 
     const hasSelection = !!next.selectedObjectId;
     selectionCard.hidden =

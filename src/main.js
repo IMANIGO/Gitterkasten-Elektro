@@ -16,6 +16,7 @@ import { setState, state } from "./state.js";
 import {
   BUILTIN_PLANS,
   buildPlanInScene,
+  capturePlanFromScene,
   exportPlanJson,
   getPlan,
   parsePlanJson,
@@ -77,20 +78,43 @@ selection = createSelectionController({
 });
 
 const importedPlans = [];
-let activePlan = BUILTIN_PLANS[0];
+/** @type {'live' | string} */
+let activePlanId = "live-aufbau";
+let cachedLivePlan = null;
+
+function captureLive() {
+  cachedLivePlan = capturePlanFromScene(placedRoot, wiring);
+  return cachedLivePlan;
+}
 
 const plansApi = {
   listPlans() {
-    return [...BUILTIN_PLANS, ...importedPlans];
+    const live = cachedLivePlan || {
+      id: "live-aufbau",
+      planNr: "LIVE",
+      title: "Aufbauplan — Live aus 3D-Aufbau",
+      live: true,
+    };
+    return [live, ...BUILTIN_PLANS, ...importedPlans];
   },
   getPlan(id) {
+    if (id === "live-aufbau") return captureLive();
     return [...BUILTIN_PLANS, ...importedPlans].find((p) => p.id === id) || getPlan(id);
   },
   getActivePlan() {
-    return activePlan;
+    if (activePlanId === "live-aufbau") return captureLive();
+    return plansApi.getPlan(activePlanId) || captureLive();
   },
   setActivePlan(plan) {
-    activePlan = plan;
+    activePlanId = plan?.id || "live-aufbau";
+    if (activePlanId === "live-aufbau") captureLive();
+  },
+  /** Re-read 3D scene into the live plan document. */
+  refreshLive() {
+    return captureLive();
+  },
+  isLive() {
+    return activePlanId === "live-aufbau";
   },
   registerPlan(plan) {
     if (!importedPlans.some((p) => p.id === plan.id)) importedPlans.push(plan);
@@ -104,6 +128,8 @@ const plansApi = {
   exportJson: exportPlanJson,
   importJson: parsePlanJson,
 };
+
+captureLive();
 
 bindUi({ applyPreset, takeoff, selection, plansApi });
 

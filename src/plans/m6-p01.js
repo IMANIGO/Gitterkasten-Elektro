@@ -5,9 +5,9 @@
  */
 export const PLAN_M6_P01 = {
   id: "m6-p01",
-  title: "Aufbauplan — Montagekasten",
+  title: "Beispielvorlage — Montagekasten (nicht live)",
   planNr: "M6-P01",
-  modul: "Modul 6 · 3. Lehrjahr",
+  modul: "Modul 6 · 3. Lehrjahr · Vorlage",
   blatt: "01",
   /** Plan-Maß der Flächen (cm) — Referenzzeichnung */
   faces: {
