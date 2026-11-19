@@ -121,6 +121,7 @@ export function createSelectionController({
       selectedPositionText: null,
       selectedStationSlots: null,
       selectedRcboSpec: null,
+      selectedMcbSpec: null,
       selectionAction: null,
     });
   }
@@ -136,6 +137,7 @@ export function createSelectionController({
       selectedPositionText: formatPosition(object),
       selectedStationSlots: object.userData?.slots ? [...object.userData.slots] : null,
       selectedRcboSpec: object.userData?.rcboSpec ? { ...object.userData.rcboSpec } : null,
+      selectedMcbSpec: object.userData?.mcbSpec ? { ...object.userData.mcbSpec } : null,
       selectedCatalogId: null,
       selectionAction: null,
       placementFeedback: null,
@@ -351,6 +353,7 @@ export function createSelectionController({
 function factoryOptsFromState(item) {
   if (item?.factory === "controlStation") return { slots: state.stationSlots };
   if (item?.factory === "rcbo1p") return { spec: state.rcboSpec };
+  if (item?.factory === "mcb1p" || item?.factory === "mcb3p") return { spec: state.mcbSpec };
   return {};
 }
 

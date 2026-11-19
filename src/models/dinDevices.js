@@ -3,6 +3,14 @@ import { materials } from "../materials.js";
 import { MM, TE, toMm } from "../units.js";
 import { makeTextPlate } from "./labels.js";
 import {
+  applyMcbSpec,
+  formatMcbMeta,
+  formatMcbPrint,
+  makeMcbPlate,
+  makeOnMark,
+  normalizeMcbSpec,
+} from "./mcbSpec.js";
+import {
   applyRcboSpec,
   formatRcboMeta,
   formatRcboPrint,
@@ -10,7 +18,7 @@ import {
   normalizeRcboSpec,
 } from "./rcboSpec.js";
 
-export { applyRcboSpec };
+export { applyRcboSpec, applyMcbSpec };
 
 function mesh(geo, mat) {
   const m = new THREE.Mesh(geo, mat);
@@ -50,7 +58,7 @@ export function createDinDevice({
   const root = new THREE.Group();
   root.name = name;
 
-  if (ghost && variant !== "rcbo") {
+  if (ghost && variant !== "rcbo" && variant !== "mcb") {
     const body = mesh(
       new THREE.BoxGeometry(width - 0.2 * MM, height, depth),
       materials.ghost.clone(),
@@ -66,7 +74,7 @@ export function createDinDevice({
   } else if (variant === "rcbo") {
     buildRcboBody(root, { width, height, depth, spec, ghost });
   } else {
-    buildMcbBody(root, { width, height, depth, levers, label });
+    buildMcbBody(root, { width, height, depth, levers, spec, ghost });
   }
 
   root.add(dinFoot(width - 1 * MM));
@@ -75,84 +83,112 @@ export function createDinDevice({
     return root;
   }
   const fitted = variant === "rcbo" ? normalizeRcboSpec(spec) : null;
+  const fittedMcb = variant === "mcb" ? normalizeMcbSpec(spec) : null;
   root.userData = {
     pickable: true,
     selectable: true,
     id,
     catalogId: id,
-    name: fitted ? `FI/LS ${formatRcboPrint(fitted)}` : name,
-    meta: fitted ? formatRcboMeta(fitted) : meta,
+    name: fitted
+      ? `FI/LS ${formatRcboPrint(fitted)}`
+      : fittedMcb
+        ? `LS ${levers}P ${formatMcbPrint(fittedMcb)}`
+        : name,
+    meta: fitted ? formatRcboMeta(fitted) : fittedMcb ? formatMcbMeta(fittedMcb, levers) : meta,
     kind: "dinDevice",
     te,
     widthMm: toMm(width),
     ...(fitted ? { rcboSpec: fitted } : {}),
+    ...(fittedMcb ? { mcbSpec: fittedMcb, poles: levers } : {}),
   };
   return root;
 }
 
-/** LS: light housing, tall black rocker levers with colored tip, rating window. */
-function buildMcbBody(root, { width, height, depth, levers, label }) {
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0xf7f5ef,
-    roughness: 0.42,
+/**
+ * Reiner LS, 1P oder mehrpolig. Helles Gehäuse, eine Klemme je Pol,
+ * durchgehende dunkle Schaltwippe, rotes I je Pol, Aufdruck der Charakteristik.
+ * Ohne Herstellerzeichen.
+ */
+function buildMcbBody(root, { width, height, depth, levers, spec, ghost }) {
+  const poles = Math.max(1, levers || 1);
+  const shell = ghost
+    ? materials.ghost.clone()
+    : new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.45, metalness: 0.06 });
+  const cheekMat = ghost
+    ? shell
+    : new THREE.MeshStandardMaterial({ color: 0xd5dae0, roughness: 0.5, metalness: 0.08 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2e32, roughness: 0.5, metalness: 0.28 });
+  const seamMat = new THREE.MeshStandardMaterial({ color: 0xc5ccd3, roughness: 0.45, metalness: 0.05 });
+  const toggleMat = new THREE.MeshStandardMaterial({ color: 0x3c4046, roughness: 0.4, metalness: 0.16 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0xd7e6f0,
+    roughness: 0.12,
     metalness: 0.04,
+    transparent: true,
+    opacity: ghost ? 0.28 : 0.55,
   });
-  const body = mesh(new THREE.BoxGeometry(width - 0.2 * MM, height, depth * 0.92), bodyMat);
-  body.position.set(0, height / 2, depth / 2 - 24 * MM);
+
+  const bodyD = depth * 0.78;
+  const bodyZ = depth / 2 - 26 * MM;
+  const body = mesh(new THREE.BoxGeometry(width - 0.3 * MM, height - 1.5 * MM, bodyD), shell);
+  body.position.set(0, height / 2, bodyZ);
   root.add(body);
+  const frontZ = bodyZ + bodyD / 2;
 
-  // Front step / face plate
-  const face = mesh(
-    new THREE.BoxGeometry(width - 1.2 * MM, height * 0.72, 4 * MM),
-    new THREE.MeshStandardMaterial({ color: 0xefede6, roughness: 0.48, metalness: 0.05 }),
-  );
-  face.position.set(0, height * 0.42, depth / 2 - 20 * MM);
-  root.add(face);
+  const cheek = mesh(new THREE.BoxGeometry(1.3 * MM, height * 0.78, bodyD * 0.72), cheekMat);
+  cheek.position.set(width / 2 - 0.2 * MM, height * 0.4, bodyZ);
+  root.add(cheek);
 
-  // Cooling slots
-  for (let i = 0; i < 3; i++) {
-    const slot = mesh(
-      new THREE.BoxGeometry(width * 0.55, 1.2 * MM, 1 * MM),
-      materials.plasticBlack,
-    );
-    slot.position.set(0, 12 * MM + i * 5 * MM, depth / 2 - 19.2 * MM);
-    root.add(slot);
+  const hood = mesh(new THREE.BoxGeometry(width - 0.8 * MM, 14 * MM, 16 * MM), shell);
+  hood.position.set(0, height - 9 * MM, frontZ - 5 * MM);
+  root.add(hood);
+
+  if (poles > 1) {
+    for (let i = 1; i < poles; i++) {
+      const x = -width / 2 + (width / poles) * i;
+      const seam = mesh(new THREE.BoxGeometry(0.45 * MM, height * 0.9, 1.1 * MM), seamMat);
+      seam.position.set(x, height * 0.48, frontZ + 0.4 * MM);
+      root.add(seam);
+    }
   }
 
-  const leverW = (width - 3 * MM) / levers;
-  for (let i = 0; i < levers; i++) {
-    const x = -width / 2 + 1.5 * MM + leverW * (i + 0.5);
-    // Tall toggle (I/O style)
-    const lever = mesh(
-      new THREE.BoxGeometry(Math.max(leverW * 0.5, 5 * MM), 28 * MM, 9 * MM),
-      materials.lever,
-    );
-    lever.position.set(x, height - 18 * MM, depth / 2 - 14 * MM);
-    lever.rotation.x = -0.35;
-    root.add(lever);
-    const tip = mesh(
-      new THREE.BoxGeometry(Math.max(leverW * 0.5, 5 * MM), 5 * MM, 9.2 * MM),
-      new THREE.MeshStandardMaterial({ color: 0xb71c1c, roughness: 0.4, metalness: 0.1 }),
-    );
-    tip.position.set(x, height - 6 * MM, depth / 2 - 11 * MM);
-    tip.rotation.x = -0.35;
-    root.add(tip);
+  for (let i = 0; i < poles; i++) {
+    const x = -width / 2 + (width / poles) * (i + 0.5);
+    const topHole = mesh(new THREE.CylinderGeometry(2.5 * MM, 2.5 * MM, 2.6 * MM, 18), dark);
+    topHole.position.set(x, height - 1.2 * MM, frontZ - 8 * MM);
+    root.add(topHole);
+    const bottomHole = mesh(new THREE.CylinderGeometry(2.2 * MM, 2.2 * MM, 2.4 * MM, 16), dark);
+    bottomHole.position.set(x, 2 * MM, frontZ - 10 * MM);
+    root.add(bottomHole);
   }
 
-  // Amp window
-  const win = mesh(
-    new THREE.BoxGeometry(Math.min(width - 4 * MM, 14 * MM), 10 * MM, 1.5 * MM),
-    new THREE.MeshStandardMaterial({ color: 0xd8e8f5, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.85 }),
-  );
-  win.position.set(0, height * 0.28, depth / 2 - 19 * MM);
+  const rim = mesh(new THREE.BoxGeometry(width - 1.8 * MM, 13 * MM, 1.2 * MM), dark);
+  rim.position.set(0, height * 0.67, frontZ + 0.3 * MM);
+  root.add(rim);
+  const win = mesh(new THREE.BoxGeometry(width - 3.2 * MM, 11 * MM, 1.8 * MM), glass);
+  win.position.set(0, height * 0.67, frontZ + 1.2 * MM);
   root.add(win);
 
-  const plate = makeTextPlate(label, Math.min(toMm(width) - 2, 40), 8, {
-    bg: "#1e2226",
-    fg: "#f2f0ea",
-    size: 44,
-  });
-  plate.position.set(0, height * 0.55, depth / 2 - 19.5 * MM);
+  const lever = mesh(new THREE.BoxGeometry(width + 3 * MM, 6.4 * MM, 6.2 * MM), toggleMat);
+  lever.position.set(0, height * 0.52, frontZ + 2.8 * MM);
+  root.add(lever);
+  for (const side of [-1, 1]) {
+    const cap = mesh(new THREE.CylinderGeometry(3.1 * MM, 3.1 * MM, 6.4 * MM, 16), toggleMat);
+    cap.rotation.z = Math.PI / 2;
+    cap.position.set(side * (width / 2 + 0.6 * MM), height * 0.52, frontZ + 2.8 * MM);
+    root.add(cap);
+  }
+
+  for (let i = 0; i < poles; i++) {
+    const x = -width / 2 + (width / poles) * (i + 0.5);
+    const mark = makeOnMark(Math.min(6, (toMm(width) / poles) * 0.55), 3.2);
+    mark.position.set(x, height * 0.43, frontZ + 1.3 * MM);
+    root.add(mark);
+  }
+
+  const plateW = poles === 1 ? 15 : 26;
+  const plate = makeMcbPlate(spec, poles, plateW, poles === 1 ? 18 : 16);
+  plate.position.set(0, height * 0.26, frontZ + 1.2 * MM);
   root.add(plate);
 }
 
@@ -289,28 +325,32 @@ function buildRcboBody(root, { width, height, depth, spec, ghost }) {
 }
 
 export function createMcb1p(opts = {}) {
+  const spec = normalizeMcbSpec(opts.spec || opts);
   return createDinDevice({
     te: 1,
-    label: "B16",
+    label: formatMcbPrint(spec),
     id: "ls-1p",
-    name: "LS-Schalter 1P",
-    meta: "1 TE · 18 × 90 × 70 mm · B16",
+    name: `LS 1P ${formatMcbPrint(spec)}`,
+    meta: formatMcbMeta(spec, 1),
     levers: 1,
     variant: "mcb",
-    ...opts,
+    spec,
+    ghost: !!opts.ghost,
   });
 }
 
 export function createMcb3p(opts = {}) {
+  const spec = normalizeMcbSpec(opts.spec || opts);
   return createDinDevice({
     te: 3,
-    label: "3P B16",
+    label: formatMcbPrint(spec),
     id: "ls-3p",
-    name: "LS-Schalter 3P",
-    meta: "3 TE · 54 × 90 × 70 mm · B16",
+    name: `LS 3P ${formatMcbPrint(spec)}`,
+    meta: formatMcbMeta(spec, 3),
     levers: 3,
     variant: "mcb",
-    ...opts,
+    spec,
+    ghost: !!opts.ghost,
   });
 }
 

@@ -1,4 +1,5 @@
 import { DEFAULT_STATION_SLOTS } from "./models/controlStation.js";
+import { DEFAULT_MCB_SPEC } from "./models/mcbSpec.js";
 import { DEFAULT_RCBO_SPEC } from "./models/rcboSpec.js";
 import { defaultCableSpec } from "./wiring/cableTypes.js";
 
@@ -22,6 +23,9 @@ export const state = {
   /** Charakteristik des FI/LS vor dem Platzieren */
   rcboSpec: { ...DEFAULT_RCBO_SPEC },
   selectedRcboSpec: null,
+  /** Charakteristik der reinen LS vor dem Platzieren */
+  mcbSpec: { ...DEFAULT_MCB_SPEC },
+  selectedMcbSpec: null,
   selectedObjectId: null,
   selectedLabel: null,
   selectedPositionText: null,

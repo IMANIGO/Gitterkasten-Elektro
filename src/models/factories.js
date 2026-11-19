@@ -71,7 +71,14 @@ export function createGhostFromFactory(factoryName, opts = {}) {
   const object = createFromFactory(factoryName, { ...opts, ghost: true });
   if (!object) return null;
   // Steuerstelle und FI/LS behalten Farbe und Aufdruck, das Gehäuse ist schon durchscheinend.
-  if (factoryName === "controlStation" || factoryName === "rcbo1p") return object;
+  if (
+    factoryName === "controlStation" ||
+    factoryName === "rcbo1p" ||
+    factoryName === "mcb1p" ||
+    factoryName === "mcb3p"
+  ) {
+    return object;
+  }
   object.traverse((child) => {
     if (!child.isMesh || !child.material) return;
     child.material = materials.ghost.clone();

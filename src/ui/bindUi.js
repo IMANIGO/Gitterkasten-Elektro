@@ -4,6 +4,7 @@ import {
   getCatalog,
 } from "../catalog/index.js";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
+import { applyMcbSpec, MCB_FIELDS, mcbSpecFromFields, mcbSpecKey } from "../models/mcbSpec.js";
 import { applyRcboSpec, RCBO_FIELDS, rcboSpecKey, specFromFields } from "../models/rcboSpec.js";
 import { setState, state, subscribe } from "../state.js";
 import {
@@ -63,10 +64,14 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const stationEdit = document.getElementById("station-edit");
   const rcboSetup = document.getElementById("rcbo-setup");
   const rcboEdit = document.getElementById("rcbo-edit");
+  const mcbSetup = document.getElementById("mcb-setup");
+  const mcbEdit = document.getElementById("mcb-edit");
   let stationSetupKey = "";
   let stationEditKey = "";
   let rcboSetupKey = "";
   let rcboEditKey = "";
+  let mcbSetupKey = "";
+  let mcbEditKey = "";
 
   function fillStationFields(container, slots, onChange) {
     container.innerHTML = "";
@@ -150,6 +155,72 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       rcboEditKey = `${object.uuid}:${rcboSpecKey(nextSpec)}`;
       setState({
         selectedRcboSpec: { ...nextSpec },
+        selectedLabel: object.userData.name,
+      });
+    });
+  }
+
+  function fillMcbFields(container, spec, onChange) {
+    container.innerHTML = "";
+    const title = document.createElement("p");
+    title.textContent = "Charakteristik";
+    container.appendChild(title);
+    for (const field of MCB_FIELDS) {
+      const label = document.createElement("label");
+      label.append(field.label);
+      const select = document.createElement("select");
+      select.dataset.field = field.key;
+      select.innerHTML = field.options
+        .map((o) => `<option value="${o.id}">${o.label}</option>`)
+        .join("");
+      select.value = String(spec?.[field.key] ?? "");
+      select.addEventListener("change", () => {
+        const values = {};
+        for (const node of container.querySelectorAll("select")) values[node.dataset.field] = node.value;
+        onChange(mcbSpecFromFields(values));
+      });
+      label.appendChild(select);
+      container.appendChild(label);
+    }
+  }
+
+  function syncMcbSetup(next) {
+    if (!mcbSetup) return;
+    const show =
+      next.mode === "betriebsmittel" && (next.selectedCatalogId === "ls-1p" || next.selectedCatalogId === "ls-3p");
+    mcbSetup.hidden = !show;
+    if (!show) {
+      mcbSetupKey = "";
+      return;
+    }
+    const key = mcbSpecKey(next.mcbSpec);
+    if (key === mcbSetupKey && mcbSetup.childElementCount) return;
+    mcbSetupKey = key;
+    fillMcbFields(mcbSetup, next.mcbSpec, (spec) => {
+      mcbSetupKey = mcbSpecKey(spec);
+      setState({ mcbSpec: spec });
+    });
+  }
+
+  function syncMcbEdit(next) {
+    if (!mcbEdit) return;
+    const spec = next.selectedMcbSpec;
+    const show = !!spec && !!next.selectedObjectId;
+    mcbEdit.hidden = !show;
+    if (!show) {
+      mcbEditKey = "";
+      return;
+    }
+    const key = `${next.selectedObjectId}:${mcbSpecKey(spec)}`;
+    if (key === mcbEditKey && mcbEdit.childElementCount) return;
+    mcbEditKey = key;
+    fillMcbFields(mcbEdit, spec, (nextSpec) => {
+      const object = selection?.getSelected?.();
+      if (!object) return;
+      applyMcbSpec(object, nextSpec);
+      mcbEditKey = `${object.uuid}:${mcbSpecKey(nextSpec)}`;
+      setState({
+        selectedMcbSpec: { ...nextSpec },
         selectedLabel: object.userData.name,
       });
     });
@@ -368,7 +439,9 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
                   ? { slots: state.stationSlots }
                   : item.factory === "rcbo1p"
                     ? { spec: state.rcboSpec }
-                    : {};
+                    : item.factory === "mcb1p" || item.factory === "mcb3p"
+                      ? { spec: state.mcbSpec }
+                      : {};
               const next = createFromFactory(item.factory, opts);
               if (!next) return;
               selection.applyMoveOrReplace(pose, next, item);
@@ -603,6 +676,8 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     syncStationEdit(next);
     syncRcboSetup(next);
     syncRcboEdit(next);
+    syncMcbSetup(next);
+    syncMcbEdit(next);
 
     if (next.hovered && !hasSelection && next.mode === "ansicht") {
       hoverCard.hidden = false;
