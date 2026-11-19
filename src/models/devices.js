@@ -345,68 +345,105 @@ export function createOutlet(opts = {}) {
   });
 }
 
-/** CEE 16 A surface socket — industrial red housing, 5-pin face (generic). */
+/**
+ * CEE 16 A 5p wall socket: light housing, 25° sloping front, red hinged lid.
+ * Generic IEC 60309 form, no maker name.
+ */
 export function createCeeOutlet({ ghost = false } = {}) {
-  const W = 100 * MM;
-  const H = 100 * MM;
-  const D = 70 * MM;
-  const mat = ghost ? materials.ghost.clone() : materials.ceeRed;
+  const W = 118 * MM;
+  const H = 132 * MM;
+  const shell = ghost
+    ? materials.ghost.clone()
+    : new THREE.MeshStandardMaterial({ color: 0xf3f1ec, roughness: 0.48, metalness: 0.04 });
+  const red = ghost
+    ? shell
+    : new THREE.MeshStandardMaterial({ color: 0xc4452d, roughness: 0.4, metalness: 0.06 });
+  const dark = ghost
+    ? shell
+    : new THREE.MeshStandardMaterial({ color: 0x241e1c, roughness: 0.55, metalness: 0.08 });
   const root = new THREE.Group();
   root.name = "CEE-Steckdose 16 A";
 
-  const body = mesh(new THREE.BoxGeometry(W, H, D * 0.5), mat);
-  body.position.z = (D * 0.5) / 2;
-  root.add(body);
+  const upperH = 78 * MM;
+  const upper = mesh(new THREE.BoxGeometry(W, upperH, 70 * MM), shell);
+  upper.position.set(0, H / 2 - upperH / 2, 35 * MM);
+  root.add(upper);
 
-  // Flange
-  const flange = mesh(new THREE.BoxGeometry(W + 6 * MM, H + 6 * MM, 4 * MM), mat);
-  flange.position.z = D * 0.5 + 2 * MM;
-  root.add(flange);
+  const gland = mesh(new THREE.CylinderGeometry(8 * MM, 9.5 * MM, 12 * MM, 16), shell);
+  gland.position.set(0, H / 2 + 4 * MM, 30 * MM);
+  root.add(gland);
+  const glandNut = mesh(new THREE.CylinderGeometry(11 * MM, 11 * MM, 4 * MM, 6), shell);
+  glandNut.position.set(0, H / 2 + 1 * MM, 30 * MM);
+  root.add(glandNut);
 
-  const collar = mesh(new THREE.CylinderGeometry(36 * MM, 38 * MM, 18 * MM, 32), mat);
+  const nose = new THREE.Group();
+  nose.position.set(0, -16 * MM, 58 * MM);
+  nose.rotation.x = (25 * Math.PI) / 180;
+
+  const cheek = mesh(new THREE.BoxGeometry(W * 0.94, 58 * MM, 42 * MM), shell);
+  cheek.position.set(0, -6 * MM, -8 * MM);
+  nose.add(cheek);
+
+  const collar = mesh(new THREE.CylinderGeometry(31 * MM, 34 * MM, 18 * MM, 32), red);
   collar.rotation.x = Math.PI / 2;
-  collar.position.z = D * 0.5 + 12 * MM;
-  root.add(collar);
+  collar.position.set(0, -4 * MM, 12 * MM);
+  nose.add(collar);
+
+  const insert = mesh(new THREE.CylinderGeometry(22 * MM, 22 * MM, 5 * MM, 28), dark);
+  insert.rotation.x = Math.PI / 2;
+  insert.position.set(0, -4 * MM, 18 * MM);
+  nose.add(insert);
+
+  // 6h: Schutzkontakt unten, vier Buchsen im Kreis.
+  for (const [deg, radius] of [
+    [270, 4.6],
+    [198, 3.1],
+    [126, 3.1],
+    [54, 3.1],
+    [342, 3.1],
+  ]) {
+    const angle = (deg * Math.PI) / 180;
+    const hole = mesh(
+      new THREE.CylinderGeometry(radius * MM, radius * MM, 7 * MM, 10),
+      ghost ? shell : materials.plasticBlack,
+    );
+    hole.rotation.x = Math.PI / 2;
+    hole.position.set(Math.cos(angle) * 12 * MM, -4 * MM + Math.sin(angle) * 12 * MM, 20 * MM);
+    nose.add(hole);
+  }
+
+  const lidPivot = new THREE.Group();
+  lidPivot.position.set(0, 26 * MM, 8 * MM);
+  lidPivot.rotation.x = -0.95;
+  const lid = mesh(new THREE.CylinderGeometry(33 * MM, 33 * MM, 6 * MM, 28), red);
+  lid.rotation.x = Math.PI / 2;
+  lid.position.set(0, -32 * MM, 2 * MM);
+  const grip = mesh(new THREE.BoxGeometry(22 * MM, 7 * MM, 4 * MM), red);
+  grip.position.set(0, -62 * MM, 4 * MM);
+  lidPivot.add(lid, grip);
+  nose.add(lidPivot);
+  root.add(nose);
+
+  const screw = mesh(
+    new THREE.CylinderGeometry(2.1 * MM, 2.1 * MM, 3 * MM, 8),
+    ghost ? shell : materials.brass,
+  );
+  screw.rotation.z = Math.PI / 2;
+  screw.position.set(W / 2 - 1 * MM, 18 * MM, 42 * MM);
+  root.add(screw);
 
   if (!ghost) {
-    const faceDisk = mesh(
-      new THREE.CylinderGeometry(30 * MM, 30 * MM, 3 * MM, 32),
-      new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.45, metalness: 0.08 }),
-    );
-    faceDisk.rotation.x = Math.PI / 2;
-    faceDisk.position.z = D * 0.5 + 20 * MM;
-    root.add(faceDisk);
-
-    for (const [ang, r] of [
-      [0, 12],
-      [72, 12],
-      [144, 12],
-      [216, 12],
-      [288, 8],
-    ]) {
-      const rad = (ang * Math.PI) / 180;
-      const pin = mesh(
-        new THREE.CylinderGeometry(r === 8 ? 3.8 * MM : 2.8 * MM, r === 8 ? 3.8 * MM : 2.8 * MM, 10 * MM, 10),
-        materials.plasticBlack,
-      );
-      pin.rotation.x = Math.PI / 2;
-      pin.position.set(Math.cos(rad) * 15 * MM, Math.sin(rad) * 15 * MM, D * 0.5 + 22 * MM);
-      root.add(pin);
-    }
-    const plate = makeTextPlate("16A 5p", 36, 10, { bg: "#6b1212", fg: "#f2f0ea", size: 44 });
-    plate.position.set(0, -42 * MM, D * 0.5 + 5 * MM);
-    root.add(plate);
     root.userData = {
       pickable: true,
       selectable: true,
       id: "cee-16a",
       catalogId: "cee-16a",
       name: "CEE-Steckdose 16 A",
-      meta: "100 × 100 × 70 mm · 5-polig · 400 V",
+      meta: "118 × 132 × 96 mm · schräge Front 25° · Klappdeckel · 5p 400 V 6h · IP44",
       kind: "surfaceDevice",
-      widthMm: 100,
-      heightMm: 100,
-      depthMm: 70,
+      widthMm: 118,
+      heightMm: 132,
+      depthMm: 96,
     };
   }
   return root;
