@@ -435,12 +435,128 @@ export function createSwitch(opts = {}) {
 export function createPushbutton(opts = {}) {
   return createApDevice({
     id: "taster",
-    name: "AP-Taster",
-    meta: "80 × 80 × 42 mm · Aufputz · 1 Schließer",
+    name: "AP-Taster START",
+    meta: "80 × 80 × 42 mm · Aufputz · Schließer",
     face: "pushbutton",
     depthMm: 42,
     ...opts,
   });
+}
+
+/** STOP / Öffner — red actuator, otherwise same AP envelope. */
+export function createPushbuttonStop(opts = {}) {
+  const root = createApDevice({
+    id: "taster-stop",
+    name: "AP-Taster STOP",
+    meta: "80 × 80 × 42 mm · Aufputz · Öffner",
+    face: "pushbutton",
+    depthMm: 42,
+    ...opts,
+  });
+  if (!opts.ghost) {
+    root.traverse((c) => {
+      if (c.isMesh && c.material?.color && c.geometry?.type === "CylinderGeometry") {
+        const r = c.geometry.parameters?.radiusTop;
+        if (r && r > 10 * MM) c.material = materials.testBtn;
+      }
+    });
+    root.userData.catalogId = "taster-stop";
+    root.userData.id = "taster-stop";
+    root.userData.name = "AP-Taster STOP";
+    root.userData.meta = "80 × 80 × 42 mm · Aufputz · Öffner";
+  }
+  return root;
+}
+
+/** CEE 16 A surface socket — red industrial look, generic (no brand marks). */
+export function createCeeOutlet({ ghost = false } = {}) {
+  const W = 100 * MM;
+  const H = 100 * MM;
+  const D = 70 * MM;
+  const mat = ghost ? materials.ghost.clone() : materials.ceeRed;
+  const root = new THREE.Group();
+  root.name = "CEE-Steckdose 16 A";
+  const body = mesh(new THREE.BoxGeometry(W, H, D * 0.55), mat);
+  body.position.z = (D * 0.55) / 2;
+  root.add(body);
+  const face = mesh(new THREE.CylinderGeometry(32 * MM, 32 * MM, 12 * MM, 32), mat);
+  face.rotation.x = Math.PI / 2;
+  face.position.z = D * 0.55 + 6 * MM;
+  root.add(face);
+  if (!ghost) {
+    for (const [ang, r] of [
+      [0, 12],
+      [72, 12],
+      [144, 12],
+      [216, 12],
+      [288, 8],
+    ]) {
+      const rad = (ang * Math.PI) / 180;
+      const pin = mesh(
+        new THREE.CylinderGeometry(r === 8 ? 3.5 * MM : 2.8 * MM, r === 8 ? 3.5 * MM : 2.8 * MM, 8 * MM, 10),
+        materials.plasticBlack,
+      );
+      pin.rotation.x = Math.PI / 2;
+      pin.position.set(Math.cos(rad) * 14 * MM, Math.sin(rad) * 14 * MM, D * 0.55 + 10 * MM);
+      root.add(pin);
+    }
+    const plate = makeTextPlate("16A", 28, 10, { bg: "#8b1a1a", fg: "#f2f0ea", size: 48 });
+    plate.position.set(0, -38 * MM, D * 0.55 + 1 * MM);
+    root.add(plate);
+    root.userData = {
+      pickable: true,
+      id: "cee-16a",
+      catalogId: "cee-16a",
+      name: "CEE-Steckdose 16 A",
+      meta: "100 × 100 × 70 mm · 5-polig · 400 V",
+      kind: "surfaceDevice",
+      widthMm: 100,
+      heightMm: 100,
+      depthMm: 70,
+    };
+  }
+  return root;
+}
+
+/** Simple AP luminaire / Leuchte for training box. */
+export function createLuminaire({ ghost = false } = {}) {
+  const W = 120 * MM;
+  const H = 60 * MM;
+  const D = 50 * MM;
+  const mat = ghost ? materials.ghost.clone() : materials.apWhite;
+  const root = new THREE.Group();
+  root.name = "Leuchte";
+  const body = mesh(new THREE.BoxGeometry(W, H, D * 0.4), mat);
+  body.position.z = (D * 0.4) / 2;
+  root.add(body);
+  const glass = mesh(
+    new THREE.BoxGeometry(W - 10 * MM, H - 10 * MM, D * 0.35),
+    ghost
+      ? materials.ghost.clone()
+      : new THREE.MeshStandardMaterial({
+          color: 0xf5f0c8,
+          roughness: 0.25,
+          metalness: 0.05,
+          emissive: 0x665522,
+          emissiveIntensity: 0.25,
+        }),
+  );
+  glass.position.z = D * 0.4 + (D * 0.35) / 2;
+  root.add(glass);
+  if (!ghost) {
+    root.userData = {
+      pickable: true,
+      id: "leuchte",
+      catalogId: "leuchte",
+      name: "Leuchte",
+      meta: "120 × 60 × 50 mm · Beleuchtung",
+      kind: "surfaceDevice",
+      widthMm: 120,
+      heightMm: 60,
+      depthMm: 50,
+    };
+  }
+  return root;
 }
 
 /**

@@ -34,6 +34,7 @@
         <button type="button" class="active" data-mode="ansicht">Ansicht</button>
         <button type="button" data-mode="betriebsmittel">Betriebsmittel</button>
         <button type="button" data-mode="verdrahtung">Verdrahtung</button>
+        <button type="button" data-mode="plaene">Pläne</button>
         <button type="button" data-mode="aufmass">Aufmaß</button>
       </div>
 
@@ -88,6 +89,32 @@
         <ul id="takeoff-list"></ul>
         <p class="kicker takeoff-sub">Leitungen</p>
         <ul id="takeoff-cables"></ul>
+      </aside>
+
+      <aside class="plans-panel" id="plans-panel" hidden>
+        <header class="library-head">
+          <p class="kicker">Dokumentation</p>
+          <h2>Pläne</h2>
+          <p class="library-hint">Aufbauplan anzeigen / laden und in 3D bauen · Stromlauf · Klemmenliste</p>
+        </header>
+        <div class="plans-toolbar">
+          <select id="plan-select"></select>
+          <button type="button" id="btn-build-plan">In 3D bauen</button>
+          <label class="file-btn">
+            JSON laden
+            <input type="file" id="plan-upload" accept="application/json,.json" hidden />
+          </label>
+          <button type="button" id="btn-export-plan">JSON export</button>
+        </div>
+        <nav class="plan-tabs" aria-label="Plandokument">
+          <button type="button" data-plan-doc="aufbau" class="active">Aufbauplan</button>
+          <button type="button" data-plan-doc="stromlauf">Stromlaufplan</button>
+          <button type="button" data-plan-doc="klemmen">Klemmenliste</button>
+        </nav>
+        <div class="plan-doc" id="plan-doc"></div>
+        <footer class="library-foot">
+          <p class="feedback" id="plan-feedback"></p>
+        </footer>
       </aside>
 
       <footer class="statusbar">

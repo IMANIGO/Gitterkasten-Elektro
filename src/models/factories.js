@@ -1,11 +1,14 @@
 import { materials } from "../materials.js";
 import { createCableClamp } from "./cableClamp.js";
 import {
+  createCeeOutlet,
   createJunctionBox,
+  createLuminaire,
   createMcb1p,
   createMcb3p,
   createOutlet,
   createPushbutton,
+  createPushbuttonStop,
   createRcbo1p,
   createRcd4p,
   createSwitch,
@@ -31,6 +34,9 @@ const FACTORIES = {
   outlet: createOutlet,
   switch: createSwitch,
   pushbutton: createPushbutton,
+  pushbuttonStop: createPushbuttonStop,
+  ceeOutlet: createCeeOutlet,
+  luminaire: createLuminaire,
   junctionBox: createJunctionBox,
   cableClamp: createCableClamp,
 };

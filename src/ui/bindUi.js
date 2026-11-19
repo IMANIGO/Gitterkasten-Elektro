@@ -17,10 +17,11 @@ const MODE_LABELS = {
   ansicht: "Ansicht",
   betriebsmittel: "Betriebsmittel",
   verdrahtung: "Verdrahtung",
+  plaene: "Pläne",
   aufmass: "Aufmaß",
 };
 
-export function bindUi({ applyPreset, takeoff, selection }) {
+export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const hoverCard = document.getElementById("hover-card");
   const hoverName = document.getElementById("hover-name");
   const hoverMeta = document.getElementById("hover-meta");
@@ -41,9 +42,45 @@ export function bindUi({ applyPreset, takeoff, selection }) {
   const takeoffSummary = document.getElementById("takeoff-summary");
   const takeoffList = document.getElementById("takeoff-list");
   const takeoffCables = document.getElementById("takeoff-cables");
+  const plansPanel = document.getElementById("plans-panel");
+  const planSelect = document.getElementById("plan-select");
+  const planDoc = document.getElementById("plan-doc");
+  const planFeedback = document.getElementById("plan-feedback");
   const statusMode = document.getElementById("status-mode");
   const presetButtons = [...document.querySelectorAll("[data-preset]")];
   const modeButtons = [...document.querySelectorAll("[data-mode]")];
+  const planDocButtons = [...document.querySelectorAll("[data-plan-doc]")];
+
+  let currentPlan = plansApi?.getActivePlan?.() || null;
+
+  function fillPlanSelect() {
+    if (!planSelect || !plansApi) return;
+    const list = plansApi.listPlans();
+    planSelect.innerHTML = list
+      .map((p) => `<option value="${p.id}">${p.planNr || p.id} — ${p.title}</option>`)
+      .join("");
+    if (currentPlan) planSelect.value = currentPlan.id;
+  }
+
+  function renderPlanDoc() {
+    if (!planDoc || !currentPlan || !plansApi) return;
+    const view = state.planDocView || "aufbau";
+    if (view === "stromlauf") {
+      planDoc.innerHTML = plansApi.renderStromlauf(currentPlan);
+    } else if (view === "klemmen") {
+      planDoc.innerHTML = plansApi.renderKlemmen(currentPlan);
+    } else {
+      planDoc.innerHTML = plansApi.renderAufbau(currentPlan);
+    }
+  }
+
+  function setActivePlan(plan) {
+    currentPlan = plan;
+    plansApi?.setActivePlan?.(plan);
+    if (planSelect && plan) planSelect.value = plan.id;
+    renderPlanDoc();
+    setState({ activePlanId: plan?.id || null });
+  }
 
   function fillCableSelects() {
     cableType.innerHTML = CABLE_TYPES.map(
@@ -213,6 +250,57 @@ export function bindUi({ applyPreset, takeoff, selection }) {
 
   fillCableSelects();
   renderLibrary();
+  fillPlanSelect();
+  if (plansApi?.listPlans()?.[0]) setActivePlan(plansApi.listPlans()[0]);
+
+  planSelect?.addEventListener("change", () => {
+    const plan = plansApi.getPlan(planSelect.value);
+    if (plan) setActivePlan(plan);
+  });
+
+  planDocButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setState({ planDocView: btn.dataset.planDoc });
+      planDocButtons.forEach((b) => b.classList.toggle("active", b === btn));
+      renderPlanDoc();
+    });
+  });
+
+  document.getElementById("btn-build-plan")?.addEventListener("click", () => {
+    if (!currentPlan) return;
+    const result = plansApi.build(currentPlan);
+    if (planFeedback) {
+      planFeedback.textContent = `${result.placed} Bauteile gebaut${
+        result.skipped.length ? ` · fehlt: ${result.skipped.join(", ")}` : ""
+      }`;
+    }
+  });
+
+  document.getElementById("btn-export-plan")?.addEventListener("click", () => {
+    if (!currentPlan) return;
+    const blob = new Blob([plansApi.exportJson(currentPlan)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentPlan.id || "aufbauplan"}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById("plan-upload")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const plan = plansApi.importJson(text);
+      plansApi.registerPlan(plan);
+      fillPlanSelect();
+      setActivePlan(plan);
+      if (planFeedback) planFeedback.textContent = `Plan geladen: ${plan.planNr || plan.id}`;
+    } catch (err) {
+      if (planFeedback) planFeedback.textContent = `Import fehlgeschlagen: ${err.message}`;
+    }
+    event.target.value = "";
+  });
 
   subscribe((next) => {
     presetButtons.forEach((button) => {
@@ -226,6 +314,7 @@ export function bindUi({ applyPreset, takeoff, selection }) {
     libraryPanel.hidden = !showLibrary;
     takeoffCard.hidden = next.mode !== "aufmass";
     cableForm.hidden = next.mode !== "verdrahtung";
+    if (plansPanel) plansPanel.hidden = next.mode !== "plaene";
 
     const hasSelection = !!next.selectedObjectId;
     selectionCard.hidden = !hasSelection || (next.mode !== "betriebsmittel" && next.mode !== "ansicht");

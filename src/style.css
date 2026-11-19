@@ -47,6 +47,7 @@ body {
 .library-panel,
 .takeoff-card,
 .selection-card,
+.plans-panel,
 .statusbar {
   pointer-events: auto;
 }
@@ -183,8 +184,116 @@ button:disabled {
 .takeoff-card[hidden],
 .hover-card[hidden],
 .selection-card[hidden],
+.plans-panel[hidden],
 .cable-form[hidden] {
   display: none !important;
+}
+
+.plans-panel {
+  position: absolute;
+  top: 148px;
+  right: 16px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.plans-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.plans-toolbar select,
+.plans-toolbar button,
+.file-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(242, 240, 234, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.file-btn {
+  display: inline-flex;
+  align-items: center;
+}
+
+.plan-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.plan-tabs button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.plan-tabs button.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.plan-doc {
+  overflow: auto;
+  flex: 1;
+  background: #fff;
+  color: #111;
+  min-height: 220px;
+}
+
+.plan-doc svg {
+  display: block;
+}
+
+.klemmenliste {
+  padding: 12px 14px;
+  font-family: var(--font);
+}
+
+.klemmenliste h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.klemmenliste p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #666;
+}
+
+.klemmenliste table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.klemmenliste th,
+.klemmenliste td {
+  border: 1px solid #ccc;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.klemmenliste th {
+  background: #f0eee8;
 }
 
 .cable-form {

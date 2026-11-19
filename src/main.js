@@ -13,6 +13,16 @@ import { createTakeoff } from "./takeoff/index.js";
 import { bindUi } from "./ui/bindUi.js";
 import { createWiringLayer } from "./wiring/index.js";
 import { state } from "./state.js";
+import {
+  BUILTIN_PLANS,
+  buildPlanInScene,
+  exportPlanJson,
+  getPlan,
+  parsePlanJson,
+  renderAufbauplanSvg,
+  renderKlemmenlisteHtml,
+  renderStromlaufplanSvg,
+} from "./plans/index.js";
 
 const canvas = document.getElementById("viewport");
 const { renderer } = createRenderer(canvas);
@@ -66,7 +76,36 @@ selection = createSelectionController({
   placement,
 });
 
-bindUi({ applyPreset, takeoff, selection });
+const importedPlans = [];
+let activePlan = BUILTIN_PLANS[0];
+
+const plansApi = {
+  listPlans() {
+    return [...BUILTIN_PLANS, ...importedPlans];
+  },
+  getPlan(id) {
+    return [...BUILTIN_PLANS, ...importedPlans].find((p) => p.id === id) || getPlan(id);
+  },
+  getActivePlan() {
+    return activePlan;
+  },
+  setActivePlan(plan) {
+    activePlan = plan;
+  },
+  registerPlan(plan) {
+    if (!importedPlans.some((p) => p.id === plan.id)) importedPlans.push(plan);
+  },
+  build(plan) {
+    return buildPlanInScene(plan, placedRoot);
+  },
+  renderAufbau: renderAufbauplanSvg,
+  renderStromlauf: renderStromlaufplanSvg,
+  renderKlemmen: renderKlemmenlisteHtml,
+  exportJson: exportPlanJson,
+  importJson: parsePlanJson,
+};
+
+bindUi({ applyPreset, takeoff, selection, plansApi });
 
 let pointerDown = null;
 canvas.addEventListener("pointerdown", (event) => {
@@ -103,5 +142,6 @@ window.__pruefwand = {
   wiring,
   placedRoot,
   selection,
+  plansApi,
   state,
 };

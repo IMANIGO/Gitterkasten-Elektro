@@ -148,6 +148,11 @@ export const materials = {
     metalness: 0.02,
     roughness: 0.65,
   }),
+  ceeRed: new THREE.MeshStandardMaterial({
+    color: 0xb83228,
+    metalness: 0.08,
+    roughness: 0.48,
+  }),
   cable: new THREE.MeshStandardMaterial({
     color: 0xb8b0a0,
     metalness: 0.05,

@@ -1,0 +1,461 @@
+{
+  "id": "m6-p01",
+  "title": "Aufbauplan — Montagekasten",
+  "planNr": "M6-P01",
+  "modul": "Modul 6 · 3. Lehrjahr",
+  "blatt": "01",
+  "faces": {
+    "left": {
+      "nr": 1,
+      "label": "Seite links",
+      "widthCm": 48.5,
+      "heightCm": 51
+    },
+    "back": {
+      "nr": 2,
+      "label": "Rückwand",
+      "widthCm": 96.5,
+      "heightCm": 51
+    },
+    "right": {
+      "nr": 3,
+      "label": "Seite rechts",
+      "widthCm": 48.5,
+      "heightCm": 51
+    },
+    "floor": {
+      "nr": 4,
+      "label": "Boden",
+      "widthCm": 96.5,
+      "heightCm": 48.5
+    }
+  },
+  "legend": [
+    {
+      "tag": "X1",
+      "label": "Schuko-Steckdose",
+      "catalogId": "steckdose"
+    },
+    {
+      "tag": "S1",
+      "label": "Wechselschalter",
+      "catalogId": "schalter"
+    },
+    {
+      "tag": "S2",
+      "label": "Wechselschalter",
+      "catalogId": "schalter"
+    },
+    {
+      "tag": "S3",
+      "label": "Taster START (Schließer)",
+      "catalogId": "taster"
+    },
+    {
+      "tag": "S0",
+      "label": "Taster STOP (Öffner)",
+      "catalogId": "taster-stop"
+    },
+    {
+      "tag": "E1",
+      "label": "Beleuchtung",
+      "catalogId": "leuchte"
+    },
+    {
+      "tag": "E2",
+      "label": "Beleuchtung",
+      "catalogId": "leuchte"
+    },
+    {
+      "tag": "X2",
+      "label": "CEE-Steckdose 16 A",
+      "catalogId": "cee-16a"
+    },
+    {
+      "tag": "UV1",
+      "label": "Unterverteilung",
+      "catalogId": "uv-3reihen"
+    }
+  ],
+  "placements": [
+    {
+      "tag": "X1",
+      "catalogId": "steckdose",
+      "face": "left",
+      "fromTopCm": 11,
+      "fromBackCm": 18
+    },
+    {
+      "tag": "S1",
+      "catalogId": "schalter",
+      "face": "left",
+      "fromTopCm": 11,
+      "fromBackCm": 31
+    },
+    {
+      "tag": "UV1",
+      "catalogId": "uv-3reihen",
+      "face": "back",
+      "fromTopCm": 26,
+      "fromLeftCm": 22
+    },
+    {
+      "tag": "E1",
+      "catalogId": "leuchte",
+      "face": "back",
+      "fromTopCm": 19,
+      "fromLeftCm": 72
+    },
+    {
+      "tag": "S2",
+      "catalogId": "schalter",
+      "face": "right",
+      "fromTopCm": 11,
+      "fromBackCm": 15
+    },
+    {
+      "tag": "S3",
+      "catalogId": "taster",
+      "face": "right",
+      "fromTopCm": 11,
+      "fromBackCm": 28
+    },
+    {
+      "tag": "S0",
+      "catalogId": "taster-stop",
+      "face": "right",
+      "fromTopCm": 24,
+      "fromBackCm": 28
+    },
+    {
+      "tag": "E2",
+      "catalogId": "leuchte",
+      "face": "floor",
+      "fromBackCm": 24,
+      "fromLeftCm": 28
+    },
+    {
+      "tag": "X2",
+      "catalogId": "cee-16a",
+      "face": "floor",
+      "fromBackCm": 24,
+      "fromLeftCm": 52
+    }
+  ],
+  "circuits": [
+    {
+      "id": "einspeisung",
+      "title": "Einspeisung X0 → UV1",
+      "cable": {
+        "typeId": "nym-j",
+        "cores": 5,
+        "mm2": 2.5
+      },
+      "from": "X0",
+      "to": "UV1",
+      "note": "Position nach Lehrplatzvorgabe"
+    },
+    {
+      "id": "steckdose-x1",
+      "title": "Steckdose X1",
+      "cable": {
+        "typeId": "nym-j",
+        "cores": 3,
+        "mm2": 1.5
+      },
+      "from": "UV1-F1.1",
+      "to": "X1",
+      "protection": "F1.1"
+    },
+    {
+      "id": "cee-x2",
+      "title": "CEE X2",
+      "cable": {
+        "typeId": "nym-j",
+        "cores": 5,
+        "mm2": 2.5
+      },
+      "from": "UV1-F2",
+      "to": "X2",
+      "protection": "F2"
+    },
+    {
+      "id": "wechsel-e1",
+      "title": "Wechselschaltung E1",
+      "cable": {
+        "typeId": "nym-j",
+        "cores": 3,
+        "mm2": 1.5
+      },
+      "from": "UV1-F1.2",
+      "via": [
+        "S1",
+        "S2"
+      ],
+      "to": "E1",
+      "protection": "F1.2"
+    },
+    {
+      "id": "leuchte-e2",
+      "title": "Leuchte E2 (über K1)",
+      "cable": {
+        "typeId": "nym-j",
+        "cores": 3,
+        "mm2": 1.5
+      },
+      "from": "UV1-K1",
+      "to": "E2",
+      "protection": "F1.3"
+    },
+    {
+      "id": "steuern-k1",
+      "title": "Steuerung K1 (S3/S0)",
+      "cable": {
+        "typeId": "nym-j",
+        "cores": 3,
+        "mm2": 1.5
+      },
+      "from": "UV1",
+      "via": [
+        "S3",
+        "S0"
+      ],
+      "to": "K1",
+      "protection": "F1"
+    }
+  ],
+  "terminals": [
+    {
+      "id": "X0:1",
+      "potential": "L1",
+      "color": "braun",
+      "from": "Einspeisung",
+      "to": "Q0:2",
+      "qmm": 2.5
+    },
+    {
+      "id": "X0:2",
+      "potential": "L2",
+      "color": "schwarz",
+      "from": "Einspeisung",
+      "to": "Q0:4",
+      "qmm": 2.5
+    },
+    {
+      "id": "X0:3",
+      "potential": "L3",
+      "color": "grau",
+      "from": "Einspeisung",
+      "to": "Q0:6",
+      "qmm": 2.5
+    },
+    {
+      "id": "X0:4",
+      "potential": "N",
+      "color": "blau",
+      "from": "Einspeisung",
+      "to": "N",
+      "qmm": 2.5
+    },
+    {
+      "id": "X0:5",
+      "potential": "PE",
+      "color": "gn/ge",
+      "from": "Einspeisung",
+      "to": "PE",
+      "qmm": 2.5
+    },
+    {
+      "id": "X1:L",
+      "potential": "L",
+      "color": "braun",
+      "from": "F1.1:2",
+      "to": "X1",
+      "qmm": 1.5
+    },
+    {
+      "id": "X1:N",
+      "potential": "N",
+      "color": "blau",
+      "from": "N",
+      "to": "X1",
+      "qmm": 1.5
+    },
+    {
+      "id": "X1:PE",
+      "potential": "PE",
+      "color": "gn/ge",
+      "from": "PE",
+      "to": "X1",
+      "qmm": 1.5
+    },
+    {
+      "id": "X2:L1",
+      "potential": "L1",
+      "color": "braun",
+      "from": "F2:2",
+      "to": "X2",
+      "qmm": 2.5
+    },
+    {
+      "id": "X2:L2",
+      "potential": "L2",
+      "color": "schwarz",
+      "from": "F2:4",
+      "to": "X2",
+      "qmm": 2.5
+    },
+    {
+      "id": "X2:L3",
+      "potential": "L3",
+      "color": "grau",
+      "from": "F2:6",
+      "to": "X2",
+      "qmm": 2.5
+    },
+    {
+      "id": "X2:N",
+      "potential": "N",
+      "color": "blau",
+      "from": "N",
+      "to": "X2",
+      "qmm": 2.5
+    },
+    {
+      "id": "X2:PE",
+      "potential": "PE",
+      "color": "gn/ge",
+      "from": "PE",
+      "to": "X2",
+      "qmm": 2.5
+    },
+    {
+      "id": "S1:1",
+      "potential": "L",
+      "color": "braun",
+      "from": "F1.2:2",
+      "to": "S1",
+      "qmm": 1.5
+    },
+    {
+      "id": "S1:2",
+      "potential": "a",
+      "color": "grau",
+      "from": "S1",
+      "to": "S2",
+      "qmm": 1.5
+    },
+    {
+      "id": "S1:3",
+      "potential": "b",
+      "color": "schwarz",
+      "from": "S1",
+      "to": "S2",
+      "qmm": 1.5
+    },
+    {
+      "id": "S2:1",
+      "potential": "a",
+      "color": "grau",
+      "from": "S1",
+      "to": "S2",
+      "qmm": 1.5
+    },
+    {
+      "id": "S2:2",
+      "potential": "b",
+      "color": "schwarz",
+      "from": "S1",
+      "to": "S2",
+      "qmm": 1.5
+    },
+    {
+      "id": "S2:3",
+      "potential": "L'",
+      "color": "braun",
+      "from": "S2",
+      "to": "E1",
+      "qmm": 1.5
+    },
+    {
+      "id": "E1:N",
+      "potential": "N",
+      "color": "blau",
+      "from": "N",
+      "to": "E1",
+      "qmm": 1.5
+    },
+    {
+      "id": "E1:PE",
+      "potential": "PE",
+      "color": "gn/ge",
+      "from": "PE",
+      "to": "E1",
+      "qmm": 1.5
+    },
+    {
+      "id": "S3:1",
+      "potential": "L",
+      "color": "braun",
+      "from": "F1:2",
+      "to": "S3",
+      "qmm": 1.5
+    },
+    {
+      "id": "S3:2",
+      "potential": "Steuer",
+      "color": "schwarz",
+      "from": "S3",
+      "to": "S0",
+      "qmm": 1.5
+    },
+    {
+      "id": "S0:1",
+      "potential": "Steuer",
+      "color": "schwarz",
+      "from": "S3",
+      "to": "S0",
+      "qmm": 1.5
+    },
+    {
+      "id": "S0:2",
+      "potential": "A1",
+      "color": "schwarz",
+      "from": "S0",
+      "to": "K1:A1",
+      "qmm": 1.5
+    },
+    {
+      "id": "K1:A2",
+      "potential": "N",
+      "color": "blau",
+      "from": "N",
+      "to": "K1:A2",
+      "qmm": 1.5
+    },
+    {
+      "id": "E2:L",
+      "potential": "L",
+      "color": "braun",
+      "from": "K1:14",
+      "to": "E2",
+      "qmm": 1.5
+    },
+    {
+      "id": "E2:N",
+      "potential": "N",
+      "color": "blau",
+      "from": "N",
+      "to": "E2",
+      "qmm": 1.5
+    },
+    {
+      "id": "E2:PE",
+      "potential": "PE",
+      "color": "gn/ge",
+      "from": "PE",
+      "to": "E2",
+      "qmm": 1.5
+    }
+  ]
+}

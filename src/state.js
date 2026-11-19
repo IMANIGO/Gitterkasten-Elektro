@@ -19,6 +19,9 @@ export const state = {
   selectedPositionText: null,
   /** @type {null | 'move' | 'replace'} */
   selectionAction: null,
+  activePlanId: null,
+  /** @type {'aufbau' | 'stromlauf' | 'klemmen'} */
+  planDocView: "aufbau",
 };
 
 export function subscribe(fn) {
