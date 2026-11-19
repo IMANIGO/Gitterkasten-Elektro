@@ -9,8 +9,15 @@ import {
   computeClampDistancesAlongPath,
 } from "./clampRules.js";
 import {
+  coreColorsFor,
+  formatCableSpec,
+  normalizeCableSpec,
+  sheathDiameterM,
+} from "./cableTypes.js";
+import {
   buildFilletedPath,
   createCableMesh,
+  createWireEndFan,
   isLikelyBoxCorner,
   pointAtDistance,
 } from "./pathGeometry.js";
@@ -51,9 +58,6 @@ function findFace(object) {
   let current = object;
   while (current) {
     if (current.userData?.face) return current.userData.face;
-    if (current.userData?.mount === "lochblech" && current.userData.face) {
-      return current.userData.face;
-    }
     current = current.parent;
   }
   return null;
@@ -61,7 +65,6 @@ function findFace(object) {
 
 function orientClamp(clamp, point, tangent, face) {
   clamp.position.copy(point);
-  // Align clamp so cable axis (local Z) follows tangent; base toward wall
   const zAxis = tangent.clone().normalize();
   let yAxis;
   if (face === "back") yAxis = new THREE.Vector3(0, 0, 1);
@@ -80,8 +83,17 @@ function orientClamp(clamp, point, tangent, face) {
   clamp.quaternion.setFromRotationMatrix(m);
 }
 
+function sheathMaterial(spec) {
+  const mat = materials.cable.clone();
+  if (spec.typeId === "h07v-u") {
+    const cores = coreColorsFor(spec);
+    mat.color.set(cores[0]?.color ?? 0x3a3a3a);
+  }
+  return mat;
+}
+
 /**
- * Verdrahtung layer: click waypoints on Lochblech, finish run → cable + Schellen.
+ * Verdrahtung layer: click waypoints on Lochblech, finish run → cable + Schellen + Aderenden.
  */
 export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
   const group = new THREE.Group();
@@ -96,6 +108,10 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+
+  function currentSpec() {
+    return normalizeCableSpec(state.cableSpec);
+  }
 
   function clearDraftVisuals() {
     if (draftPreview) {
@@ -122,10 +138,12 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       draftPreview = null;
     }
     if (draftPoints.length < 2) return;
+    const spec = currentSpec();
+    const radius = sheathDiameterM(spec.cores, spec.mm2, spec.typeId) / 2;
     const { points } = buildFilletedPath(draftPoints, {
       isBoxCorner: (a, b, c) => isLikelyBoxCorner(a, b, c, BOX_BOUNDS),
     });
-    draftPreview = createCableMesh(points, materials.ghost.clone());
+    draftPreview = createCableMesh(points, materials.ghost.clone(), radius);
     if (draftPreview) {
       draftPreview.userData.ghost = true;
       group.add(draftPreview);
@@ -141,21 +159,44 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       return null;
     }
 
+    const spec = currentSpec();
+    const radius = sheathDiameterM(spec.cores, spec.mm2, spec.typeId) / 2;
+    const cores = coreColorsFor(spec);
+    const label = formatCableSpec(spec);
+
     const { points, length, bends } = buildFilletedPath(draftPoints, {
       isBoxCorner: (a, b, c) => isLikelyBoxCorner(a, b, c, BOX_BOUNDS),
     });
 
     const runGroup = new THREE.Group();
     runGroup.name = `Leitung ${runs.length + 1}`;
-    const cable = createCableMesh(points, materials.cable);
+    const cable = createCableMesh(points, sheathMaterial(spec), radius);
     if (cable) {
       cable.userData = {
         pickable: true,
         id: `leitung-${runs.length + 1}`,
-        name: "Leitung",
-        meta: `${toMm(length)} mm · Schellen-Regel 70 / max 220 mm`,
+        name: `Leitung ${label}`,
+        meta: `${toMm(length)} mm · ${label} · Schellen 70 / max 220 mm`,
+        cableSpec: { ...spec },
       };
       runGroup.add(cable);
+    }
+
+    // Aderenden at both ends
+    if (points.length >= 2) {
+      const t0 = points[1].clone().sub(points[0]).normalize();
+      const t1 = points[points.length - 1]
+        .clone()
+        .sub(points[points.length - 2])
+        .normalize();
+      const startFan = createWireEndFan(
+        points[0],
+        t0.clone().negate(),
+        cores,
+        radius,
+      );
+      const endFan = createWireEndFan(points[points.length - 1], t1, cores, radius);
+      runGroup.add(startFan, endFan);
     }
 
     const distances = computeClampDistancesAlongPath(length);
@@ -165,7 +206,6 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       if (!sample) continue;
       const clamp = createCableClamp();
       orientClamp(clamp, sample.point, sample.tangent, draftFace || "back");
-      // Offset clamp slightly toward wall so base sits on Lochblech
       const wallNormal =
         draftFace === "floor"
           ? new THREE.Vector3(0, 1, 0)
@@ -192,6 +232,8 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       bends,
       face: draftFace,
       group: runGroup,
+      cableSpec: { ...spec },
+      label,
     };
     runs.push(run);
 
@@ -201,9 +243,9 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
         : null;
 
     setState({
-      wiringFeedback: `Leitung ${run.lengthMm} mm · ${clamps.length} Schellen${
-        spacingMm != null ? ` · Abstand ${spacingMm} mm (max ${CLAMP_RULES_MM.maxSpacingMm})` : ""
-      } · Rand ${CLAMP_RULES_MM.fromEquipmentMm} mm`,
+      wiringFeedback: `${label} · ${run.lengthMm} mm · ${clamps.length} Schellen${
+        spacingMm != null ? ` · Abstand ${spacingMm} mm` : ""
+      } · ${cores.map((c) => c.label).join("/")} Enden`,
       wireCount: runs.length,
       lastWireLengthMm: run.lengthMm,
     });
@@ -224,6 +266,7 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
   function onClick(event) {
     if (!canvas || state.mode !== "verdrahtung") return;
     if (event.button !== 0) return;
+    if (state.selectionAction) return;
 
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
@@ -244,7 +287,6 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       return;
     }
     if (draftFace && draftFace !== face && draftPoints.length > 0) {
-      // Allow face change only via orthogonal corner at shared edge — for v1 keep same face
       setState({ wiringFeedback: "Leitung vorerst auf einer Fläche halten · Enter zum Abschluss" });
       return;
     }
@@ -252,7 +294,6 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     draftFace = face;
     const pt = snapWirePoint(hits[0].point, face);
 
-    // Orthogonal constraint: after first point, only move on one axis at a time
     if (draftPoints.length > 0) {
       const last = draftPoints[draftPoints.length - 1];
       const dx = Math.abs(pt.x - last.x);
@@ -268,15 +309,15 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
         if (dz >= dy) pt.y = last.y;
         else pt.z = last.z;
       }
-      // Skip zero-length segments
       if (pt.distanceTo(last) < 10 * MM) return;
     }
 
     draftPoints.push(pt);
     addMarker(pt);
     refreshDraftPreview();
+    const spec = currentSpec();
     setState({
-      wiringFeedback: `Punkt ${draftPoints.length} · Enter/Doppelklick = Leitung + Schellen`,
+      wiringFeedback: `${formatCableSpec(spec)} · Punkt ${draftPoints.length} · Enter = fertig`,
     });
   }
 
@@ -304,6 +345,18 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     }
   }
 
+  // Refresh preview diameter when cable spec changes
+  let lastSpecKey = "";
+  function syncSpecPreview() {
+    const spec = currentSpec();
+    const key = `${spec.typeId}-${spec.mm2}-${spec.cores}`;
+    if (key !== lastSpecKey) {
+      lastSpecKey = key;
+      refreshDraftPreview();
+    }
+  }
+  const specTimer = setInterval(syncSpecPreview, 300);
+
   if (canvas) {
     canvas.addEventListener("pointerup", onClick);
     canvas.addEventListener("dblclick", onDblClick);
@@ -321,6 +374,7 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       return runs.reduce((s, r) => s + r.clamps.length, 0);
     },
     dispose() {
+      clearInterval(specTimer);
       if (!canvas) return;
       canvas.removeEventListener("pointerup", onClick);
       canvas.removeEventListener("dblclick", onDblClick);

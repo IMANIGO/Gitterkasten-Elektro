@@ -4,6 +4,14 @@ import {
   getCatalog,
 } from "../catalog/index.js";
 import { setState, state, subscribe } from "../state.js";
+import {
+  CABLE_TYPES,
+  CORE_COUNTS,
+  CROSS_SECTIONS_MM2,
+  coreColorsFor,
+  formatCableSpec,
+  normalizeCableSpec,
+} from "../wiring/cableTypes.js";
 
 const MODE_LABELS = {
   ansicht: "Ansicht",
@@ -12,7 +20,7 @@ const MODE_LABELS = {
   aufmass: "Aufmaß",
 };
 
-export function bindUi({ applyPreset, takeoff }) {
+export function bindUi({ applyPreset, takeoff, selection }) {
   const hoverCard = document.getElementById("hover-card");
   const hoverName = document.getElementById("hover-name");
   const hoverMeta = document.getElementById("hover-meta");
@@ -20,13 +28,64 @@ export function bindUi({ applyPreset, takeoff }) {
   const libraryTitle = document.getElementById("library-title");
   const libraryHint = document.getElementById("library-hint");
   const libraryBody = document.getElementById("library-body");
+  const cableForm = document.getElementById("cable-form");
+  const cableType = document.getElementById("cable-type");
+  const cableMm2 = document.getElementById("cable-mm2");
+  const cableCores = document.getElementById("cable-cores");
+  const cablePreview = document.getElementById("cable-preview");
   const placementFeedback = document.getElementById("placement-feedback");
+  const selectionCard = document.getElementById("selection-card");
+  const selectionName = document.getElementById("selection-name");
+  const selectionDims = document.getElementById("selection-dims");
   const takeoffCard = document.getElementById("takeoff-card");
   const takeoffSummary = document.getElementById("takeoff-summary");
   const takeoffList = document.getElementById("takeoff-list");
+  const takeoffCables = document.getElementById("takeoff-cables");
   const statusMode = document.getElementById("status-mode");
   const presetButtons = [...document.querySelectorAll("[data-preset]")];
   const modeButtons = [...document.querySelectorAll("[data-mode]")];
+
+  function fillCableSelects() {
+    cableType.innerHTML = CABLE_TYPES.map(
+      (t) => `<option value="${t.id}">${t.label}</option>`,
+    ).join("");
+    cableMm2.innerHTML = CROSS_SECTIONS_MM2.map(
+      (v) => `<option value="${v}">${v} mm²</option>`,
+    ).join("");
+    cableCores.innerHTML = CORE_COUNTS.map(
+      (v) => `<option value="${v}">${v}</option>`,
+    ).join("");
+    const spec = state.cableSpec;
+    cableType.value = spec.typeId;
+    cableMm2.value = String(spec.mm2);
+    cableCores.value = String(spec.cores);
+    updateCablePreview();
+  }
+
+  function readCableForm() {
+    return normalizeCableSpec({
+      typeId: cableType.value,
+      mm2: Number(cableMm2.value),
+      cores: Number(cableCores.value),
+    });
+  }
+
+  function updateCablePreview() {
+    const spec = readCableForm();
+    // Keep UI selects in sync if single-core forced
+    cableCores.value = String(spec.cores);
+    const colors = coreColorsFor(spec);
+    cablePreview.textContent = `${formatCableSpec(spec)} · Enden ${colors
+      .map((c) => c.label)
+      .join("/")}`;
+    setState({ cableSpec: spec });
+  }
+
+  ["change", "input"].forEach((evt) => {
+    cableType.addEventListener(evt, updateCablePreview);
+    cableMm2.addEventListener(evt, updateCablePreview);
+    cableCores.addEventListener(evt, updateCablePreview);
+  });
 
   function renderLibrary() {
     const catalog = getCatalog();
@@ -51,7 +110,38 @@ export function bindUi({ applyPreset, takeoff }) {
         }</span>`;
         btn.addEventListener("click", () => {
           if (!item.placeable) return;
-          setState({ selectedCatalogId: item.id });
+          // Replace at current position immediately
+          if (state.selectionAction === "replace" && selection?.getSelected()) {
+            const object = selection.getSelected();
+            const pose = {
+              position: {
+                x: object.position.x,
+                y: object.position.y,
+                z: object.position.z,
+              },
+              rotation: {
+                x: object.rotation.x,
+                y: object.rotation.y,
+                z: object.rotation.z,
+              },
+              parent: object.parent,
+              mount: object.userData?.placement?.mount,
+              face: object.userData?.placement?.face,
+              teIndex: object.userData?.placement?.teIndex,
+              abutting: object.userData?.placement?.abutting,
+              feedback: object.userData?.placement?.feedback || "gleiche Position",
+            };
+            import("../models/factories.js").then(({ createFromFactory }) => {
+              const next = createFromFactory(item.factory);
+              if (!next) return;
+              selection.applyMoveOrReplace(pose, next, item);
+            });
+            return;
+          }
+          setState({
+            selectedCatalogId: item.id,
+            selectionAction: null,
+          });
         });
         section.appendChild(btn);
       }
@@ -62,17 +152,30 @@ export function bindUi({ applyPreset, takeoff }) {
   function refreshTakeoff() {
     if (!takeoff) return;
     const s = takeoff.summarize();
-    takeoffSummary.textContent = `${s.laengeMm} mm Leitung · ${s.schellen} Schellen · ${s.stueck} Stück`;
+    takeoffSummary.textContent = `${s.laengeMm} mm Leitung gesamt · ${s.schellen} Schellen · ${s.stueckLines.reduce((a, l) => a + l.count, 0)} Bauteile`;
     takeoffList.innerHTML = "";
-    for (const [id, count] of Object.entries(s.byCatalog)) {
+    if (!s.stueckLines.length) {
       const li = document.createElement("li");
-      li.textContent = `${id}: ${count}`;
+      li.textContent = "Keine Bauteile";
       takeoffList.appendChild(li);
+    } else {
+      for (const line of s.stueckLines) {
+        const li = document.createElement("li");
+        li.textContent = `${line.label}: ${line.count}×`;
+        takeoffList.appendChild(li);
+      }
     }
-    if (!Object.keys(s.byCatalog).length) {
+    takeoffCables.innerHTML = "";
+    if (!s.cableLines.length) {
       const li = document.createElement("li");
-      li.textContent = "Noch keine Positionen";
-      takeoffList.appendChild(li);
+      li.textContent = "Keine Leitungen";
+      takeoffCables.appendChild(li);
+    } else {
+      for (const line of s.cableLines) {
+        const li = document.createElement("li");
+        li.textContent = `${line.label}: ${line.count}× · ${line.lengthMm} mm · ${line.schellen} Schellen`;
+        takeoffCables.appendChild(li);
+      }
     }
   }
 
@@ -85,10 +188,22 @@ export function bindUi({ applyPreset, takeoff }) {
       const mode = button.dataset.mode;
       setState({
         mode,
-        selectedCatalogId: mode === "betriebsmittel" ? state.selectedCatalogId : null,
+        selectedCatalogId: null,
+        selectionAction: null,
       });
+      selection?.clearSelection?.();
       if (mode === "aufmass") refreshTakeoff();
     });
+  });
+
+  document.getElementById("btn-delete")?.addEventListener("click", () => {
+    selection?.deleteSelected?.();
+  });
+  document.getElementById("btn-move")?.addEventListener("click", () => {
+    selection?.beginMove?.();
+  });
+  document.getElementById("btn-replace")?.addEventListener("click", () => {
+    selection?.beginReplace?.();
   });
 
   window.addEventListener("keydown", (event) => {
@@ -96,6 +211,7 @@ export function bindUi({ applyPreset, takeoff }) {
     if (map[event.key]) applyPreset(map[event.key]);
   });
 
+  fillCableSelects();
   renderLibrary();
 
   subscribe((next) => {
@@ -109,11 +225,23 @@ export function bindUi({ applyPreset, takeoff }) {
     const showLibrary = next.mode === "betriebsmittel" || next.mode === "verdrahtung";
     libraryPanel.hidden = !showLibrary;
     takeoffCard.hidden = next.mode !== "aufmass";
+    cableForm.hidden = next.mode !== "verdrahtung";
+
+    const hasSelection = !!next.selectedObjectId;
+    selectionCard.hidden = !hasSelection || (next.mode !== "betriebsmittel" && next.mode !== "ansicht");
+    if (hasSelection) {
+      selectionName.textContent = next.selectedLabel || "Bauteil";
+      selectionDims.textContent = next.selectedPositionText || "";
+    }
 
     if (next.mode === "betriebsmittel") {
       libraryTitle.textContent = "Betriebsmittel";
       libraryHint.textContent =
-        "Artikel wählen, Vorschau auf Raster / TE, Klick zum Platzieren";
+        next.selectionAction === "replace"
+          ? "Ersatz wählen, dann Montagepunkt anklicken"
+          : next.selectionAction === "move"
+            ? "Neue Position auf Raster / TE anklicken"
+            : "Artikel wählen → platzieren (Auswahl springt zurück) · Bauteil anklicken zum Bearbeiten";
       libraryBody.hidden = false;
       [...libraryBody.querySelectorAll(".catalog-item")].forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.catalogId === next.selectedCatalogId);
@@ -122,7 +250,7 @@ export function bindUi({ applyPreset, takeoff }) {
     } else if (next.mode === "verdrahtung") {
       libraryTitle.textContent = "Verdrahtung";
       libraryHint.textContent =
-        "Punkte auf Lochblech setzen (orthogonal) · Enter / Doppelklick = Leitung + Schellen (70 / max 220 mm)";
+        "Typ / Querschnitt / Adern wählen · Punkte auf Lochblech · Enter = Leitung + farbige Enden + Schellen";
       libraryBody.hidden = true;
       placementFeedback.textContent = next.wiringFeedback || "Leitungspfad zeichnen";
     }
@@ -131,11 +259,11 @@ export function bindUi({ applyPreset, takeoff }) {
       statusMode.textContent = `Modus: ${MODE_LABELS[next.mode] || next.mode}`;
     }
 
-    if (next.hovered && next.mode === "ansicht") {
+    if (next.hovered && !hasSelection && next.mode === "ansicht") {
       hoverCard.hidden = false;
       hoverName.textContent = next.hovered.name;
       hoverMeta.textContent = next.hovered.meta;
-    } else if (next.hovered && next.mode !== "betriebsmittel") {
+    } else if (next.hovered && next.mode === "verdrahtung") {
       hoverCard.hidden = false;
       hoverName.textContent = next.hovered.name;
       hoverMeta.textContent = next.hovered.meta;
@@ -150,7 +278,11 @@ export function bindUi({ applyPreset, takeoff }) {
 }
 
 function describeSelected(next) {
-  if (!next.selectedCatalogId) return "Kein Artikel gewählt";
+  if (!next.selectedCatalogId) {
+    return next.selectedObjectId
+      ? "Bauteil ausgewählt — Verschieben / Austauschen / Löschen"
+      : "Kein Artikel gewählt — Bauteil in der Szene anklicken";
+  }
   const catalog = getCatalog();
   const item = catalog.items.find((i) => i.id === next.selectedCatalogId);
   if (!item) return "";

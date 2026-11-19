@@ -24,8 +24,16 @@ function findDinRail(object) {
 
 /**
  * Betriebsmittel placement: select from catalog → ghost on raycast → click to commit.
+ * After place: catalog selection is cleared. Move/replace via selection controller.
  */
-export function createPlacementController({ canvas, camera, scene, placedRoot, controls }) {
+export function createPlacementController({
+  canvas,
+  camera,
+  scene,
+  placedRoot,
+  controls,
+  getSelection,
+}) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   let ghost = null;
@@ -110,7 +118,6 @@ export function createPlacementController({ canvas, camera, scene, placedRoot, c
   function onMove(event) {
     if (state.mode !== "betriebsmittel" || !state.selectedCatalogId) {
       clearGhost();
-      if (state.placementFeedback) setState({ placementFeedback: null });
       return;
     }
     const item = getCatalogItem(state.selectedCatalogId);
@@ -143,7 +150,6 @@ export function createPlacementController({ canvas, camera, scene, placedRoot, c
 
     g.visible = true;
     if (pose.parent) {
-      // Show ghost in world space matching rail
       const worldPos = new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z);
       pose.parent.localToWorld(worldPos);
       g.position.copy(worldPos);
@@ -191,6 +197,24 @@ export function createPlacementController({ canvas, camera, scene, placedRoot, c
     const pose = resolvePose(item, hitsFromEvent(event)) || lastPose;
     if (!pose) return;
 
+    const selection = getSelection?.();
+
+    // Move existing selection
+    if (state.selectionAction === "move" && selection?.getSelected()) {
+      selection.applyMoveOrReplace(pose, null, item);
+      clearGhost();
+      return;
+    }
+
+    // Replace: catalog chosen while replace action active
+    if (state.selectionAction === "replace" && selection?.getSelected()) {
+      const object = createFromFactory(item.factory);
+      if (!object) return;
+      selection.applyMoveOrReplace(pose, object, item);
+      clearGhost();
+      return;
+    }
+
     const object = createFromFactory(item.factory);
     if (!object) return;
     applyPoseToObject(object, pose);
@@ -200,10 +224,14 @@ export function createPlacementController({ canvas, camera, scene, placedRoot, c
       mount: pose.mount,
       face: pose.face,
       teIndex: pose.teIndex,
+      abutting: pose.abutting,
       feedback: pose.feedback,
     };
 
+    // Reset catalog selection after place
+    clearGhost();
     setState({
+      selectedCatalogId: null,
       placementFeedback: `Platziert: ${item.label} · ${pose.feedback}`,
       placedCount: (state.placedCount || 0) + 1,
     });
@@ -215,6 +243,7 @@ export function createPlacementController({ canvas, camera, scene, placedRoot, c
 
   return {
     clearGhost,
+    resolvePose,
     dispose() {
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);

@@ -43,10 +43,36 @@
           <h2 id="library-title">Betriebsmittel</h2>
           <p class="library-hint" id="library-hint">Artikel wählen, dann auf Lochblech / Hutschiene klicken</p>
         </header>
+        <div class="cable-form" id="cable-form" hidden>
+          <label>
+            Leitungstyp
+            <select id="cable-type"></select>
+          </label>
+          <label>
+            Querschnitt
+            <select id="cable-mm2"></select>
+          </label>
+          <label>
+            Adern
+            <select id="cable-cores"></select>
+          </label>
+          <p class="cable-preview" id="cable-preview"></p>
+        </div>
         <div class="library-body" id="library-body"></div>
         <footer class="library-foot">
           <p id="placement-feedback" class="feedback"></p>
         </footer>
+      </aside>
+
+      <aside class="selection-card" id="selection-card" hidden>
+        <p class="kicker">Auswahl</p>
+        <p class="name" id="selection-name"></p>
+        <p class="meta" id="selection-dims"></p>
+        <div class="selection-actions">
+          <button type="button" id="btn-move">Verschieben</button>
+          <button type="button" id="btn-replace">Austauschen</button>
+          <button type="button" id="btn-delete" class="danger">Löschen</button>
+        </div>
       </aside>
 
       <aside class="hover-card" id="hover-card" hidden>
@@ -58,7 +84,10 @@
       <aside class="takeoff-card" id="takeoff-card" hidden>
         <p class="kicker">Aufmaß</p>
         <p class="name" id="takeoff-summary"></p>
+        <p class="kicker takeoff-sub">Stückliste</p>
         <ul id="takeoff-list"></ul>
+        <p class="kicker takeoff-sub">Leitungen</p>
+        <ul id="takeoff-cables"></ul>
       </aside>
 
       <footer class="statusbar">

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { MM } from "../units.js";
 import { bendRadiusFor } from "./clampRules.js";
 
-const CABLE_RADIUS = 4 * MM;
+const DEFAULT_CABLE_RADIUS = 4 * MM;
 
 /**
  * Orthogonal polyline with true circular 90° fillets (R80 free / R90 box corner).
@@ -139,16 +139,94 @@ export function pointAtDistance(points, dist) {
   return null;
 }
 
-export function createCableMesh(points, material) {
+export function createCableMesh(points, material, radiusM = DEFAULT_CABLE_RADIUS) {
   if (points.length < 2) return null;
   const curve = new PolylineCurve(points);
   const tubular = Math.max(24, points.length * 3);
-  const geo = new THREE.TubeGeometry(curve, tubular, CABLE_RADIUS, 8, false);
+  const geo = new THREE.TubeGeometry(curve, tubular, radiusM, 8, false);
   const mesh = new THREE.Mesh(geo, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.name = "Leitung";
   return mesh;
+}
+
+/**
+ * Short colored cores at a cable end for Verklemmen.
+ * @param {THREE.Vector3} tip end point of sheath
+ * @param {THREE.Vector3} outward direction out of the sheath (away from run)
+ * @param {{ id: string, label: string, color: number }[]} cores
+ * @param {number} sheathRadiusM
+ */
+export function createWireEndFan(tip, outward, cores, sheathRadiusM) {
+  const group = new THREE.Group();
+  group.name = "Aderenden";
+  const dir = outward.clone().normalize();
+  const stubLen = 45 * MM;
+  const coreR = Math.max(0.7 * MM, sheathRadiusM * 0.22);
+
+  // Orthonormal basis for fanning
+  const up = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const side = new THREE.Vector3().crossVectors(dir, up).normalize();
+  const binormal = new THREE.Vector3().crossVectors(side, dir).normalize();
+
+  const n = cores.length;
+  cores.forEach((core, i) => {
+    const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
+    const spread = sheathRadiusM * 1.6;
+    const offset = side
+      .clone()
+      .multiplyScalar(t * spread * 0.55)
+      .add(binormal.clone().multiplyScalar((i % 2 === 0 ? 1 : -1) * spread * 0.15 * (n > 2 ? 1 : 0)));
+
+    const start = tip.clone().add(offset.clone().multiplyScalar(0.3));
+    const end = tip
+      .clone()
+      .addScaledVector(dir, stubLen)
+      .add(offset);
+
+    const mid = start.clone().lerp(end, 0.5);
+    const len = start.distanceTo(end);
+    const mat = new THREE.MeshStandardMaterial({
+      color: core.color,
+      roughness: 0.55,
+      metalness: 0.05,
+    });
+    // PE stripe: yellow body + green ring
+    if (core.id === "pe") {
+      mat.color.set(0xc7a81a);
+    }
+    const cyl = new THREE.Mesh(
+      new THREE.CylinderGeometry(coreR, coreR, len, 8),
+      mat,
+    );
+    cyl.position.copy(mid);
+    const quat = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      end.clone().sub(start).normalize(),
+    );
+    cyl.quaternion.copy(quat);
+    cyl.userData = {
+      pickable: true,
+      id: `ader-${core.id}`,
+      name: `Ader ${core.label}`,
+      meta: "Aderende zum Verklemmen",
+      coreId: core.id,
+    };
+    group.add(cyl);
+
+    if (core.id === "pe") {
+      const stripe = new THREE.Mesh(
+        new THREE.CylinderGeometry(coreR * 1.05, coreR * 1.05, len * 0.22, 8),
+        new THREE.MeshStandardMaterial({ color: 0x3d7a28, roughness: 0.5, metalness: 0.05 }),
+      );
+      stripe.position.copy(start.clone().lerp(end, 0.35));
+      stripe.quaternion.copy(quat);
+      group.add(stripe);
+    }
+  });
+
+  return group;
 }
 
 /**

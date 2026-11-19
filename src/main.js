@@ -4,6 +4,7 @@ import { createEBox } from "./models/eBox.js";
 import { createEnvironment } from "./models/environment.js";
 import { createWorkbench } from "./models/workbench.js";
 import { createPlacementController } from "./placement/controller.js";
+import { createSelectionController } from "./selection/controller.js";
 import { createCamera } from "./scene/cameras.js";
 import { createInteraction } from "./scene/interaction.js";
 import { addLighting } from "./scene/lighting.js";
@@ -25,7 +26,6 @@ scene.add(createEnvironment());
 scene.add(createWorkbench());
 scene.add(createEBox());
 
-/** User-placed Betriebsmittel live here (empty at start). */
 const placedRoot = new THREE.Group();
 placedRoot.name = "Betriebsmittel";
 scene.add(placedRoot);
@@ -40,7 +40,6 @@ const takeoff = createTakeoff({
     placedRoot.traverse((o) => {
       if (o.userData?.placed) items.push(o);
     });
-    // Also count auto Schellen via wiring summary
     return items;
   },
 });
@@ -48,10 +47,27 @@ const takeoff = createTakeoff({
 getCatalog();
 
 createInteraction(canvas, camera, scene);
-createPlacementController({ canvas, camera, scene, placedRoot, controls });
-bindUi({ applyPreset, takeoff });
 
-/** Distinguish orbit drag from click-to-place. */
+let selection = null;
+const placement = createPlacementController({
+  canvas,
+  camera,
+  scene,
+  placedRoot,
+  controls,
+  getSelection: () => selection,
+});
+
+selection = createSelectionController({
+  canvas,
+  camera,
+  scene,
+  placedRoot,
+  placement,
+});
+
+bindUi({ applyPreset, takeoff, selection });
+
 let pointerDown = null;
 canvas.addEventListener("pointerdown", (event) => {
   canvas.classList.add("is-dragging");
@@ -86,17 +102,6 @@ window.__pruefwand = {
   takeoff,
   wiring,
   placedRoot,
+  selection,
   state,
-  /** Dev helper: place UV at default back-wall spot for quick tests */
-  placeUvDemo() {
-    import("./models/distributionBoard.js").then(({ createDistributionBoard }) => {
-      import("./layout.js").then(({ UV_POSITION }) => {
-        const uv = createDistributionBoard({ includeSampleTerminals: false });
-        uv.position.set(UV_POSITION.x, UV_POSITION.y, UV_POSITION.z);
-        uv.userData.placed = true;
-        uv.userData.catalogId = "uv-3reihen";
-        placedRoot.add(uv);
-      });
-    });
-  },
 };

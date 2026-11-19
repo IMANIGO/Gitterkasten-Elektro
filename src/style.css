@@ -46,6 +46,7 @@ body {
 .hover-card,
 .library-panel,
 .takeoff-card,
+.selection-card,
 .statusbar {
   pointer-events: auto;
 }
@@ -180,8 +181,102 @@ button:disabled {
 
 .library-panel[hidden],
 .takeoff-card[hidden],
-.hover-card[hidden] {
+.hover-card[hidden],
+.selection-card[hidden],
+.cable-form[hidden] {
   display: none !important;
+}
+
+.cable-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cable-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cable-form select {
+  appearance: none;
+  background: rgba(242, 240, 234, 0.06);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 8px 10px;
+}
+
+.cable-preview {
+  margin: 0;
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.selection-card {
+  position: absolute;
+  left: 16px;
+  bottom: 48px;
+  width: 300px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 12px 16px;
+}
+
+.selection-card .name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.selection-card .meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.selection-actions button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(242, 240, 234, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.selection-actions button:hover {
+  background: rgba(242, 240, 234, 0.12);
+}
+
+.selection-actions button.danger {
+  border-color: rgba(192, 57, 43, 0.45);
+  color: #e8a39a;
+}
+
+.takeoff-sub {
+  margin: 12px 0 0;
 }
 
 .library-head {
