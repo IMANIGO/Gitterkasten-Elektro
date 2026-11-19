@@ -51,6 +51,7 @@ export function buildFilletedPath(corners, opts = {}) {
     // For a 90° orthogonal fillet with equal trim: center = enter + leave - curr
     const center = enter.clone().add(leave).sub(curr);
 
+    const enterIndex = points.length;
     points.push(enter);
 
     const startOffset = enter.clone().sub(center);
@@ -58,7 +59,14 @@ export function buildFilletedPath(corners, opts = {}) {
     const axis = new THREE.Vector3().crossVectors(startOffset, endOffset);
     if (axis.lengthSq() < 1e-12) {
       points.push(leave.clone());
-      bends.push({ index: points.length - 1, kind, radius: trim });
+      bends.push({
+        index: points.length - 1,
+        enterIndex,
+        leaveIndex: points.length - 1,
+        kind,
+        radius: trim,
+        nominalRadius: nominalR,
+      });
       continue;
     }
     axis.normalize();
@@ -75,15 +83,30 @@ export function buildFilletedPath(corners, opts = {}) {
     }
 
     points.push(leave);
-    bends.push({ index: points.length - 1, kind, radius: trim, nominalRadius: nominalR });
+    bends.push({
+      index: points.length - 1,
+      enterIndex,
+      leaveIndex: points.length - 1,
+      kind,
+      radius: trim,
+      nominalRadius: nominalR,
+      sweep,
+    });
   }
 
   points.push(corners[corners.length - 1].clone());
 
-  let length = 0;
+  const cum = [0];
   for (let i = 1; i < points.length; i++) {
-    length += points[i].distanceTo(points[i - 1]);
+    cum.push(cum[i - 1] + points[i].distanceTo(points[i - 1]));
   }
+  const length = cum[cum.length - 1] || 0;
+
+  for (const bend of bends) {
+    bend.enterDist = cum[bend.enterIndex] ?? 0;
+    bend.leaveDist = cum[bend.leaveIndex] ?? bend.enterDist;
+  }
+
   return { points, length, bends };
 }
 

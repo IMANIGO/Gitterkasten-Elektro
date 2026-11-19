@@ -41,4 +41,24 @@ const r = bendRadiusFor("free");
 const expectedMin = sharpLen - 2 * r + (Math.PI / 2) * r * 0.9;
 assert(free.length > expectedMin, `filleted length ${free.length.toFixed(4)} > ${expectedMin.toFixed(4)}`);
 
+import { computeClampLayout } from "../src/wiring/clampRules.js";
+
+const layout = computeClampLayout(free.length, { bends: free.bends });
+const roles = layout.map((c) => c.role);
+assert(roles.includes("bend-start") && roles.includes("bend-end"), "90° has clamps at curve start and end");
+const start = layout.find((c) => c.role === "bend-start");
+const end = layout.find((c) => c.role === "bend-end");
+const arcMm = (end.distanceM - start.distanceM) / MM;
+const expectArc = ((Math.PI / 2) * bendRadiusFor("free")) / MM;
+assert(Math.abs(arcMm - expectArc) < 2, `arc between clamps ${arcMm.toFixed(1)} mm ≈ R80 quarter ${expectArc.toFixed(1)} mm`);
+const inside = layout.filter(
+  (c) => c.distanceM > start.distanceM + 2 * MM && c.distanceM < end.distanceM - 2 * MM,
+);
+assert(inside.length === 0, "no Schelle in the middle of the 90° arc");
+const before = layout.filter((c) => c.distanceM < start.distanceM - 1 * MM);
+if (before.length >= 2) {
+  const gap = (before[1].distanceM - before[0].distanceM) / MM;
+  assert(gap <= 220.1, `straight spacing ${gap.toFixed(1)} mm ≤ 220`);
+}
+
 if (!process.exitCode) console.log("\nAll path-geometry checks passed.");

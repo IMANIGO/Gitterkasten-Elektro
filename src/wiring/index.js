@@ -4,7 +4,7 @@ import { materials } from "../materials.js";
 import { createCableClamp } from "../models/cableClamp.js";
 import { setState, state } from "../state.js";
 import { MM, toMm } from "../units.js";
-import { computeClampDistancesAlongPath } from "./clampRules.js";
+import { computeClampLayout } from "./clampRules.js";
 import {
   coreColorsFor,
   formatCableSpec,
@@ -169,7 +169,7 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
         pickable: true,
         id: `leitung-${runs.length + 1}`,
         name: `Leitung ${label}`,
-        meta: `${toMm(length)} mm · ${label} · Schellen 70 / max 220 mm`,
+        meta: `${toMm(length)} mm · ${label} · Schellen 70 / max 220 mm · 90° mit Schelle, R80`,
         cableSpec: { ...spec },
       };
       runGroup.add(cable);
@@ -191,20 +191,26 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
       runGroup.add(startFan, endFan);
     }
 
-    const distances = computeClampDistancesAlongPath(length);
+    const layout = computeClampLayout(length, { bends });
     const clamps = [];
-    for (const dist of distances) {
-      const sample = pointAtDistance(points, dist);
+    for (const slot of layout) {
+      const sample = pointAtDistance(points, slot.distanceM);
       if (!sample) continue;
       const face = inferFaceAtPoint(sample.point);
       const clamp = createCableClamp();
       orientClamp(clamp, sample.point, sample.tangent, face);
       clamp.position.addScaledVector(faceNormal(face), -2 * MM);
       clamp.userData.autoPlaced = true;
-      clamp.userData.alongMm = toMm(dist);
+      clamp.userData.alongMm = toMm(slot.distanceM);
       clamp.userData.face = face;
+      clamp.userData.clampRole = slot.role;
       runGroup.add(clamp);
-      clamps.push({ distanceM: dist, distanceMm: toMm(dist), face });
+      clamps.push({
+        distanceM: slot.distanceM,
+        distanceMm: toMm(slot.distanceM),
+        face,
+        role: slot.role,
+      });
     }
 
     const facesUsed = [...new Set(draftFaces)];
@@ -227,10 +233,14 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
     };
     runs.push(run);
 
-    const spacingMm =
-      clamps.length > 1
-        ? Math.round((clamps[1].distanceMm - clamps[0].distanceMm) * 10) / 10
-        : null;
+    let spacingMm = null;
+    for (let i = 1; i < clamps.length; i++) {
+      if (clamps[i - 1].role === "straight" && clamps[i].role === "straight") {
+        spacingMm = Math.round((clamps[i].distanceMm - clamps[i - 1].distanceMm) * 10) / 10;
+        break;
+      }
+    }
+    const bendClamps = clamps.filter((c) => c.role === "bend-start" || c.role === "bend-end").length;
 
     const faceText =
       facesUsed.length > 1
@@ -239,8 +249,8 @@ export function createWiringLayer({ canvas, camera, scene, controls } = {}) {
 
     setState({
       wiringFeedback: `${label} · ${run.lengthMm} mm · ${faceText} · ${clamps.length} Schellen${
-        spacingMm != null ? ` · Abstand ${spacingMm} mm` : ""
-      } · ${cores.map((c) => c.label).join("/")} Enden`,
+        bendClamps ? ` · ${bendClamps} an 90°-Kurven (R80)` : ""
+      }${spacingMm != null ? ` · Gerade ${spacingMm} mm` : ""} · ${cores.map((c) => c.label).join("/")} Enden`,
       wireCount: runs.length,
       lastWireLengthMm: run.lengthMm,
     });
