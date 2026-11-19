@@ -244,8 +244,26 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   });
 
   window.addEventListener("keydown", (event) => {
-    const map = { 1: "gesamt", 2: "uv", 3: "gitter", 4: "draufsicht" };
-    if (map[event.key]) applyPreset(map[event.key]);
+    if (event.target && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
+    const camMap = { 1: "gesamt", 2: "uv", 3: "gitter", 4: "draufsicht" };
+    if (camMap[event.key]) applyPreset(camMap[event.key]);
+    const modeMap = {
+      a: "ansicht",
+      b: "betriebsmittel",
+      v: "verdrahtung",
+      p: "plaene",
+      m: "aufmass",
+    };
+    const modeKey = event.key.toLowerCase();
+    if (modeMap[modeKey] && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      setState({
+        mode: modeMap[modeKey],
+        selectedCatalogId: null,
+        selectionAction: null,
+      });
+      selection?.clearSelection?.();
+      if (modeMap[modeKey] === "aufmass") refreshTakeoff();
+    }
   });
 
   fillCableSelects();
@@ -317,7 +335,9 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     if (plansPanel) plansPanel.hidden = next.mode !== "plaene";
 
     const hasSelection = !!next.selectedObjectId;
-    selectionCard.hidden = !hasSelection || (next.mode !== "betriebsmittel" && next.mode !== "ansicht");
+    selectionCard.hidden =
+      !hasSelection ||
+      (next.mode !== "betriebsmittel" && next.mode !== "ansicht" && next.mode !== "plaene");
     if (hasSelection) {
       selectionName.textContent = next.selectedLabel || "Bauteil";
       selectionDims.textContent = next.selectedPositionText || "";

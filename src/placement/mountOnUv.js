@@ -1,0 +1,82 @@
+import { createFromFactory } from "../models/factories.js";
+import { getCatalogItem } from "../catalog/index.js";
+import { poseOnDinRail } from "./snap.js";
+import { MM } from "../units.js";
+
+/**
+ * Collect DIN rail groups inside a UV (top row first).
+ */
+export function getUvRails(uvRoot) {
+  const rails = [];
+  uvRoot.traverse((o) => {
+    if (o.userData?.mount === "din") rails.push(o);
+  });
+  rails.sort((a, b) => b.position.y - a.position.y);
+  return rails;
+}
+
+/**
+ * Mount a catalog DIN/terminal device onto a UV rail at a TE / abutting index.
+ * @returns {THREE.Object3D|null}
+ */
+export function mountCatalogOnUvRail(uvRoot, catalogId, { row = 0, teIndex = 0 } = {}) {
+  const item = getCatalogItem(catalogId);
+  if (!item?.placeable || !item.factory) return null;
+  const rails = getUvRails(uvRoot);
+  const rail = rails[row];
+  if (!rail) return null;
+
+  const object = createFromFactory(item.factory);
+  if (!object) return null;
+
+  const widthM = item.abutting && item.widthMm ? item.widthMm * MM : (item.te || 1) * 18 * MM;
+  // Approximate local X from TE index (left-origin)
+  const half = widthM / 2;
+  const railHalf = rail.userData.railLength / 2;
+  const localX = -railHalf + half + teIndex * widthM;
+
+  const pose = poseOnDinRail(rail, { x: localX, y: 0, z: 0 }, item.abutting
+    ? { abutting: true, widthM, widthMm: item.widthMm }
+    : { teWidth: item.te || 1 });
+
+  pose.parent.add(object);
+  object.position.set(pose.position.x, pose.position.y, pose.position.z);
+  object.rotation.set(pose.rotation.x, pose.rotation.y, pose.rotation.z);
+  object.userData.placed = true;
+  object.userData.selectable = true;
+  object.userData.catalogId = item.id;
+  object.userData.placement = {
+    mount: pose.mount,
+    face: pose.face,
+    teIndex: pose.teIndex,
+    abutting: pose.abutting,
+    feedback: pose.feedback,
+  };
+  return object;
+}
+
+/**
+ * Typical protection lineup for visual / training demos (markenneutral silhouettes).
+ */
+export function mountDemoProtectionLineup(uvRoot) {
+  const mounted = [];
+  const lineup = [
+    { catalogId: "fi-4p", row: 0, teIndex: 0 },
+    { catalogId: "ls-3p", row: 0, teIndex: 4 },
+    { catalogId: "ls-1p", row: 1, teIndex: 0 },
+    { catalogId: "ls-1p", row: 1, teIndex: 1 },
+    { catalogId: "fils-1p", row: 1, teIndex: 2 },
+    { catalogId: "reihenklemme-l", row: 2, teIndex: 0 },
+    { catalogId: "reihenklemme-l", row: 2, teIndex: 1 },
+    { catalogId: "reihenklemme-n", row: 2, teIndex: 2 },
+    { catalogId: "reihenklemme-pe", row: 2, teIndex: 3 },
+  ];
+  for (const entry of lineup) {
+    const o = mountCatalogOnUvRail(uvRoot, entry.catalogId, entry);
+    if (o) {
+      o.userData.fromPlan = true;
+      mounted.push(o);
+    }
+  }
+  return mounted;
+}

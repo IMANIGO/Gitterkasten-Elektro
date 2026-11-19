@@ -12,7 +12,7 @@ import { createRenderer } from "./scene/renderer.js";
 import { createTakeoff } from "./takeoff/index.js";
 import { bindUi } from "./ui/bindUi.js";
 import { createWiringLayer } from "./wiring/index.js";
-import { state } from "./state.js";
+import { setState, state } from "./state.js";
 import {
   BUILTIN_PLANS,
   buildPlanInScene,
@@ -134,6 +134,7 @@ function tick() {
 tick();
 
 window.__pruefwand = {
+  THREE,
   scene,
   camera,
   controls,
@@ -144,4 +145,5 @@ window.__pruefwand = {
   selection,
   plansApi,
   state,
+  setState,
 };

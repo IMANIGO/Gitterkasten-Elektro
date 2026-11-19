@@ -1,5 +1,6 @@
 import { createFromFactory } from "../models/factories.js";
 import { getCatalogItem } from "../catalog/index.js";
+import { mountDemoProtectionLineup } from "../placement/mountOnUv.js";
 import { setState } from "../state.js";
 import { poseFromPlanPlacement } from "./poseFromPlan.js";
 
@@ -17,6 +18,7 @@ export function buildPlanInScene(plan, placedRoot) {
 
   const skipped = [];
   let placed = 0;
+  const uvRoots = [];
 
   for (const p of plan.placements || []) {
     const item = getCatalogItem(p.catalogId);
@@ -50,7 +52,18 @@ export function buildPlanInScene(plan, placedRoot) {
     if (p.tag) {
       object.userData.name = `${object.userData.name || item.label} (${p.tag})`;
     }
+    if (object.userData.kind === "distributionBoard") {
+      uvRoots.push(object);
+    }
     placed += 1;
+  }
+
+  // Fill UV rails with distinct Schutzorgane so Innenteile editierbar/sichtbar sind
+  if (plan.populateUv !== false) {
+    for (const uv of uvRoots) {
+      const inner = mountDemoProtectionLineup(uv);
+      placed += inner.length;
+    }
   }
 
   let total = 0;

@@ -148,36 +148,64 @@ function createHousing() {
   const hh = h / 2;
   const hd = d / 2;
 
-  const back = mesh(new THREE.BoxGeometry(w, h, t), materials.housing);
+  // Modular consumer-unit class: cool light-grey shell, warm interior backplane
+  const shell = new THREE.MeshStandardMaterial({
+    color: 0xd8dce0,
+    metalness: 0.12,
+    roughness: 0.48,
+  });
+  const shellDark = new THREE.MeshStandardMaterial({
+    color: 0xb8bec4,
+    metalness: 0.15,
+    roughness: 0.5,
+  });
+
+  const back = mesh(new THREE.BoxGeometry(w, h, t), shellDark);
   back.position.z = -hd + t / 2;
-  const left = mesh(new THREE.BoxGeometry(t, h, d), materials.housing);
+  const left = mesh(new THREE.BoxGeometry(t, h, d), shell);
   left.position.x = -hw + t / 2;
-  const right = mesh(new THREE.BoxGeometry(t, h, d), materials.housing);
+  const right = mesh(new THREE.BoxGeometry(t, h, d), shell);
   right.position.x = hw - t / 2;
-  const top = mesh(new THREE.BoxGeometry(w - 2 * t, t, d), materials.housing);
+  const top = mesh(new THREE.BoxGeometry(w - 2 * t, t, d), shell);
   top.position.y = hh - t / 2;
-  const bottom = mesh(new THREE.BoxGeometry(w - 2 * t, t, d), materials.housing);
+  const bottom = mesh(new THREE.BoxGeometry(w - 2 * t, t, d), shell);
   bottom.position.y = -hh + t / 2;
   g.add(back, left, right, top, bottom);
 
   const plate = mesh(
-    new THREE.BoxGeometry(w - 2 * t - 4 * MM, h - 2 * t - 4 * MM, 2 * MM),
-    materials.interior,
+    new THREE.BoxGeometry(w - 2 * t - 4 * MM, h - 2 * t - 4 * MM, 2.5 * MM),
+    new THREE.MeshStandardMaterial({ color: 0xece8dc, metalness: 0.04, roughness: 0.68 }),
   );
   plate.position.z = -hd + t + 3 * MM;
   g.add(plate);
 
-  const lip = 3 * MM;
+  // Front frame (door rebate) — thicker lip like open modular boards
+  const lip = 5 * MM;
   const openingZ = hd - lip / 2;
-  const frontTop = mesh(new THREE.BoxGeometry(w, lip, lip), materials.housing);
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: 0xeef1f4,
+    metalness: 0.08,
+    roughness: 0.42,
+  });
+  const frontTop = mesh(new THREE.BoxGeometry(w, lip, lip), frameMat);
   frontTop.position.set(0, hh - lip / 2, openingZ);
-  const frontBottom = mesh(new THREE.BoxGeometry(w, lip, lip), materials.housing);
+  const frontBottom = mesh(new THREE.BoxGeometry(w, lip, lip), frameMat);
   frontBottom.position.set(0, -hh + lip / 2, openingZ);
-  const frontLeft = mesh(new THREE.BoxGeometry(lip, h - 2 * lip, lip), materials.housing);
+  const frontLeft = mesh(new THREE.BoxGeometry(lip, h - 2 * lip, lip), frameMat);
   frontLeft.position.set(-hw + lip / 2, 0, openingZ);
-  const frontRight = mesh(new THREE.BoxGeometry(lip, h - 2 * lip, lip), materials.housing);
+  const frontRight = mesh(new THREE.BoxGeometry(lip, h - 2 * lip, lip), frameMat);
   frontRight.position.set(hw - lip / 2, 0, openingZ);
   g.add(frontTop, frontBottom, frontLeft, frontRight);
+
+  // Corner hinges (visual only — open board)
+  for (const sy of [-1, 1]) {
+    const hinge = mesh(
+      new THREE.CylinderGeometry(3 * MM, 3 * MM, 14 * MM, 10),
+      materials.plasticBlack,
+    );
+    hinge.position.set(-hw + 3 * MM, sy * (hh - 28 * MM), hd - 2 * MM);
+    g.add(hinge);
+  }
 
   return g;
 }
@@ -311,6 +339,8 @@ export function createDistributionBoard({
 
     root.userData = {
       pickable: true,
+      selectable: true,
+      container: true,
       id: "unterverteilung",
       catalogId: "uv-3reihen",
       name: "Unterverteilung, 3-reihig",

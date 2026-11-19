@@ -7,14 +7,35 @@ import { toMm } from "../units.js";
 
 const SELECT_COLOR = new THREE.Color(0x3d8bfd);
 
+/**
+ * Innermost selectable Betriebsmittel (DIN-Gerät in UV vor dem UV-Gehäuse).
+ * Früher wurde beim Hochlaufen die äußere UV überschrieben — Innenteile waren nicht editierbar.
+ * Container (UV) werden übersprungen, solange ein Kind-Betriebsmittel gefunden wird.
+ */
 function findPlacedRoot(object) {
   let current = object;
-  let found = null;
+  let containerFallback = null;
   while (current) {
-    if (current.userData?.placed) found = current;
+    const ud = current.userData || {};
+    const isDevice =
+      ud.kind === "dinDevice" ||
+      ud.kind === "terminal" ||
+      ud.kind === "surfaceDevice" ||
+      ud.kind === "junctionBox" ||
+      ud.kind === "cableClamp" ||
+      ud.kind === "clamp";
+    if ((ud.placed || ud.selectable) && !ud.container) {
+      return current;
+    }
+    if (ud.catalogId && isDevice) {
+      return current;
+    }
+    if ((ud.placed || ud.selectable) && ud.container && !containerFallback) {
+      containerFallback = current;
+    }
     current = current.parent;
   }
-  return found;
+  return containerFallback;
 }
 
 function prepareMesh(mesh) {
@@ -127,11 +148,19 @@ export function createSelectionController({
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects(placedRoot.children, true);
+    // Mehrere Meshes entlang des Strahls (UV-Rahmen vor DIN-Gerät) —
+    // zuerst Nicht-Container (DIN/Klemme/AP), sonst UV-Container.
+    let containerHit = null;
     for (const hit of hits) {
       const root = findPlacedRoot(hit.object);
-      if (root) return root;
+      if (!root) continue;
+      if (root.userData?.container) {
+        if (!containerHit) containerHit = root;
+        continue;
+      }
+      return root;
     }
-    return null;
+    return containerHit;
   }
 
   function onDown(event) {
@@ -141,7 +170,14 @@ export function createSelectionController({
 
   function onClick(event) {
     if (event.button !== 0) return;
-    if (state.mode !== "betriebsmittel" && state.mode !== "ansicht") return;
+    // Auswahl in Ansicht, Betriebsmittel und Pläne (nach „In 3D bauen“)
+    if (
+      state.mode !== "betriebsmittel" &&
+      state.mode !== "ansicht" &&
+      state.mode !== "plaene"
+    ) {
+      return;
+    }
     // Don't steal clicks while placing a new catalog item (unless moving)
     if (state.mode === "betriebsmittel" && state.selectedCatalogId && state.selectionAction !== "move") {
       return;
@@ -266,7 +302,13 @@ export function createSelectionController({
 
   function onKey(event) {
     if (!selected) return;
-    if (state.mode !== "betriebsmittel" && state.mode !== "ansicht") return;
+    if (
+      state.mode !== "betriebsmittel" &&
+      state.mode !== "ansicht" &&
+      state.mode !== "plaene"
+    ) {
+      return;
+    }
     if (event.key === "Delete" || event.key === "Backspace") {
       event.preventDefault();
       deleteSelected();
@@ -282,6 +324,7 @@ export function createSelectionController({
 
   return {
     getSelected: () => selected,
+    selectObject,
     clearSelection,
     deleteSelected,
     beginMove,

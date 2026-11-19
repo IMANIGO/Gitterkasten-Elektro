@@ -71,6 +71,7 @@ export function createCableClamp({ ghost = false } = {}) {
   if (!ghost) {
     root.userData = {
       pickable: true,
+      selectable: true,
       id: "leitungsschelle",
       catalogId: "leitungsschelle",
       name: "Leitungsschelle",
