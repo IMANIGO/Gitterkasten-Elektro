@@ -187,6 +187,33 @@ button:disabled {
   overflow: hidden;
 }
 
+/* Maß and Charakteristik sit beside the library, not over the list. */
+.setup-column {
+  position: absolute;
+  top: 148px;
+  right: calc(16px + 300px + 12px);
+  width: 268px;
+  max-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  pointer-events: none;
+  background: transparent;
+}
+
+.setup-column:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+.setup-column .station-setup,
+.setup-column .measure-form {
+  pointer-events: auto;
+  flex: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
 .library-panel[hidden],
 .takeoff-card[hidden],
 .hover-card[hidden],
