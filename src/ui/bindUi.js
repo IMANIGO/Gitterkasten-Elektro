@@ -11,7 +11,6 @@ import * as THREE from "three";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
 import { setDistributionCoverVisible } from "../models/distributionBoard.js";
 import {
-  MEASURE_FACES,
   dinMeasureFromLocal,
   measureLabels,
   panelMeasuresFromWorld,
@@ -661,35 +660,40 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const measurePlace = document.getElementById("measure-place");
   const moveForm = document.getElementById("measure-move");
 
-  function fillFaceSelect(select) {
-    if (!select || select.dataset.ready) return;
-    select.innerHTML = MEASURE_FACES.map((face) => `<option value="${face.id}">${face.label}</option>`).join("");
-    select.dataset.ready = "1";
-  }
-
-  function fillRailSelect(select, preferred) {
-    if (!select) return;
-    const rails = selection?.listDinRails?.() || [];
-    select.innerHTML = rails
-      .map((rail) => `<option value="${rail.uuid}">${rail.userData?.name || "Hutschiene"}</option>`)
-      .join("");
-    if (preferred && rails.some((rail) => rail.uuid === preferred)) select.value = preferred;
-  }
-
   function applyMeasureLabels(prefix, face) {
     const labels = measureLabels(face);
     const aLabel = document.getElementById(`${prefix}-a-label`);
     const bWrap = document.getElementById(`${prefix}-b-wrap`);
     const bLabel = document.getElementById(`${prefix}-b-label`);
-    const rowLabel = document.getElementById(`${prefix}-row-label`);
     if (aLabel) aLabel.textContent = labels.a;
     if (bWrap) bWrap.hidden = !labels.b;
     if (bLabel && labels.b) bLabel.textContent = labels.b;
-    if (rowLabel) rowLabel.hidden = face !== "din";
   }
 
-  function poseFromForm(prefix, item) {
-    const face = document.getElementById(`${prefix}-face`)?.value;
+  /** Lochblech stays on the back wall; a rail device uses the first DIN row. */
+  function placeTarget(item) {
+    if (item?.mount === "din") {
+      const rails = selection?.listDinRails?.() || [];
+      return { face: "din", rail: rails[0] || null };
+    }
+    return { face: "back", rail: null };
+  }
+
+  /** Keep the face and, on a rail, the row the device already occupies. */
+  function moveTarget(object) {
+    const railParent = object.parent?.userData?.mount === "din" ? object.parent : null;
+    const stored = object.userData?.placement;
+    if (railParent || stored?.face === "din" || stored?.mount === "din") {
+      return { face: "din", rail: railParent };
+    }
+    const world = new THREE.Vector3();
+    object.getWorldPosition(world);
+    const face = stored?.face && stored.face !== "din" ? stored.face : inferFaceFromWorld(world);
+    return { face, rail: null };
+  }
+
+  function readMeasure(prefix, item, target) {
+    const face = target?.face || "back";
     const a = Number(document.getElementById(`${prefix}-a`)?.value);
     const b = Number(document.getElementById(`${prefix}-b`)?.value);
     if (!Number.isFinite(a) || (face !== "din" && !Number.isFinite(b))) {
@@ -697,13 +701,11 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       return null;
     }
     if (face === "din") {
-      const rails = selection?.listDinRails?.() || [];
-      const rail = rails.find((entry) => entry.uuid === document.getElementById(`${prefix}-row`)?.value) || rails[0];
-      if (!rail) {
+      if (!target?.rail) {
         setState({ placementFeedback: "Keine Hutschiene im Aufbau" });
         return null;
       }
-      return poseFromDinMeasure(rail, a, item);
+      return poseFromDinMeasure(target.rail, a, item);
     }
     return poseFromPanelMeasures(face, a, b, itemDepthM(item));
   }
@@ -712,51 +714,42 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     const object = selection?.getSelected?.();
     if (!moveForm || !object) return;
     if (moveForm.contains(document.activeElement)) return;
-    fillFaceSelect(document.getElementById("move-face"));
-    const world = new THREE.Vector3();
-    object.getWorldPosition(world);
-    const stored = object.userData?.placement?.face;
-    const face = stored || inferFaceFromWorld(world);
-    const faceSelect = document.getElementById("move-face");
-    if (faceSelect && [...faceSelect.options].some((option) => option.value === face)) faceSelect.value = face;
-    applyMeasureLabels("move", faceSelect?.value || "back");
-    const railParent = object.parent?.userData?.mount === "din" ? object.parent : null;
-    fillRailSelect(document.getElementById("move-row"), railParent?.uuid);
-    if ((faceSelect?.value || face) === "din" && railParent) {
+    const target = moveTarget(object);
+    applyMeasureLabels("move", target.face);
+    if (target.face === "din") {
+      if (!target.rail) return;
       document.getElementById("move-a").value = String(
-        dinMeasureFromLocal(object.position.x, railParent.userData.railLength),
+        dinMeasureFromLocal(object.position.x, target.rail.userData.railLength),
       );
       return;
     }
-    const measures = panelMeasuresFromWorld(faceSelect?.value || face, world);
+    const world = new THREE.Vector3();
+    object.getWorldPosition(world);
+    const measures = panelMeasuresFromWorld(target.face, world);
     document.getElementById("move-a").value = String(measures.a);
     document.getElementById("move-b").value = String(measures.b);
   }
 
-  fillFaceSelect(document.getElementById("move-face"));
-  fillFaceSelect(document.getElementById("place-face"));
+  function syncPlaceForm() {
+    const item = getCatalogItem(state.selectedCatalogId);
+    if (!item) return;
+    applyMeasureLabels("place", placeTarget(item).face);
+  }
+
   applyMeasureLabels("move", "back");
   applyMeasureLabels("place", "back");
-  document.getElementById("move-face")?.addEventListener("change", (event) => {
-    applyMeasureLabels("move", event.target.value);
-    fillRailSelect(document.getElementById("move-row"));
-  });
-  document.getElementById("place-face")?.addEventListener("change", (event) => {
-    applyMeasureLabels("place", event.target.value);
-    fillRailSelect(document.getElementById("place-row"));
-  });
   document.getElementById("btn-move-measure")?.addEventListener("click", () => {
     const object = selection?.getSelected?.();
     const item = getCatalogItem(object?.userData?.catalogId);
-    if (!item) return;
-    const pose = poseFromForm("move", item);
+    if (!item || !object) return;
+    const pose = readMeasure("move", item, moveTarget(object));
     if (!pose) return;
     selection.moveToPose(pose);
   });
   document.getElementById("btn-place-measure")?.addEventListener("click", () => {
     const item = getCatalogItem(state.selectedCatalogId);
     if (!item?.placeable) return;
-    const pose = poseFromForm("place", item);
+    const pose = readMeasure("place", item, placeTarget(item));
     if (!pose) return;
     selection.placeFresh(item, pose);
   });
@@ -910,6 +903,12 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
       selectionName.textContent = next.selectedLabel || "Bauteil";
       selectionDims.textContent = next.selectedPositionText || "";
     }
+    const moveButton = document.getElementById("btn-move");
+    if (moveButton) {
+      const moveArmed = hasSelection && next.selectionAction === "move";
+      moveButton.classList.toggle("active", moveArmed);
+      moveButton.setAttribute("aria-pressed", moveArmed ? "true" : "false");
+    }
 
     if (librarySearch) librarySearch.hidden = next.mode !== "betriebsmittel";
     if (libraryViewBar) libraryViewBar.hidden = next.mode !== "betriebsmittel";
@@ -920,6 +919,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
         next.selectionAction !== "move"
       );
     }
+    if (measurePlace && !measurePlace.hidden) syncPlaceForm();
     if (next.selectedObjectId) syncMoveForm();
 
     if (next.mode === "betriebsmittel") {
