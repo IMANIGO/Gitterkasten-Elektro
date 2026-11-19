@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { makeTextPlate } from "../models/labels.js";
 import { MM } from "../units.js";
 import { bendRadiusFor } from "./clampRules.js";
 
@@ -185,28 +186,29 @@ export function createWireEndFan(tip, outward, cores, sheathRadiusM) {
   const group = new THREE.Group();
   group.name = "Aderenden";
   const dir = outward.clone().normalize();
-  const stubLen = 45 * MM;
-  const coreR = Math.max(0.7 * MM, sheathRadiusM * 0.22);
+  const n = cores.length;
+  const stubLen = n === 1 ? 45 * MM : 85 * MM;
+  const coreR = Math.max(1.15 * MM, sheathRadiusM * 0.2);
 
   // Orthonormal basis for fanning
   const up = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
   const side = new THREE.Vector3().crossVectors(dir, up).normalize();
   const binormal = new THREE.Vector3().crossVectors(side, dir).normalize();
 
-  const n = cores.length;
+  const startSpread = Math.max(sheathRadiusM * 0.45, 1.2 * MM);
+  const endSpread = n <= 1 ? 0 : Math.max(26 * MM, 14 * MM * ((n - 1) / 2));
+
   cores.forEach((core, i) => {
     const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
-    const spread = sheathRadiusM * 1.6;
-    const offset = side
+    const lift = n <= 2 ? 0 : (i % 2 === 0 ? 1 : -1);
+    const startOff = side.clone().multiplyScalar(t * startSpread);
+    const endOff = side
       .clone()
-      .multiplyScalar(t * spread * 0.55)
-      .add(binormal.clone().multiplyScalar((i % 2 === 0 ? 1 : -1) * spread * 0.15 * (n > 2 ? 1 : 0)));
+      .multiplyScalar(t * endSpread)
+      .add(binormal.clone().multiplyScalar(lift * endSpread * 0.22));
 
-    const start = tip.clone().add(offset.clone().multiplyScalar(0.3));
-    const end = tip
-      .clone()
-      .addScaledVector(dir, stubLen)
-      .add(offset);
+    const start = tip.clone().add(startOff);
+    const end = tip.clone().addScaledVector(dir, stubLen).add(endOff);
 
     const mid = start.clone().lerp(end, 0.5);
     const len = start.distanceTo(end);
@@ -246,6 +248,21 @@ export function createWireEndFan(tip, outward, cores, sheathRadiusM) {
       stripe.position.copy(start.clone().lerp(end, 0.35));
       stripe.quaternion.copy(quat);
       group.add(stripe);
+    }
+
+    if (core.mark) {
+      for (const sign of [1, -1]) {
+        const plate = makeTextPlate(core.mark, 8, 5, {
+          bg: "#141414",
+          fg: "#f7f7f7",
+          size: 92,
+        });
+        const face = binormal.clone().multiplyScalar(sign);
+        plate.position.copy(start.clone().lerp(end, 0.72)).addScaledVector(face, coreR + 0.6 * MM);
+        plate.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), face);
+        plate.userData = { coreMark: core.mark };
+        group.add(plate);
+      }
     }
   });
 

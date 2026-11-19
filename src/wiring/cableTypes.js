@@ -32,7 +32,7 @@ export const CABLE_TYPES = [
 
 export const CROSS_SECTIONS_MM2 = [1.5, 2.5, 4, 6];
 
-export const CORE_COUNTS = [1, 2, 3, 4, 5];
+export const CORE_COUNTS = [1, 2, 3, 4, 5, 7];
 
 /** Aderfarben für Einzeladern (Abfrage in der Verdrahtung). */
 export const CORE_COLOR_OPTIONS = [
@@ -80,10 +80,20 @@ export function sheathDiameterM(cores, mm2, typeId = "nym-j") {
   return mm * MM;
 }
 
+const CORE_BLAU = { id: "blau", label: "blau", color: 0x1f6fb2 };
+const CORE_GNGE = { id: "pe", label: "grün-gelb", color: 0xc7a81a };
+const CORE_BRAUN = { id: "braun", label: "braun", color: 0x8b5a2b };
+const CORE_SCHWARZ = { id: "schwarz", label: "schwarz", color: 0x1a1a1a };
+const CORE_GRAU = { id: "grau", label: "grau", color: 0x808080 };
+
 /**
- * Core colors for stripped ends (brown/black/grey/blue/gn-ye).
+ * Feste Aderfolge, unabhängig vom Leitungstyp.
+ * 3: blau, grün-gelb, braun
+ * 4: blau, grün-gelb, braun, schwarz
+ * 5: blau, grün-gelb, braun, schwarz, grau
+ * 7: grün-gelb, dann schwarz 1–6 (mark = weiße Nummer)
  * Einzelader: gewählte Farbe.
- * @returns {{ id: string, label: string, color: number }[]}
+ * @returns {{ id: string, label: string, color: number, mark?: string }[]}
  */
 export function coreColorsFor({ typeId, cores, coreColor }) {
   const type = CABLE_TYPES.find((t) => t.id === typeId) || CABLE_TYPES[0];
@@ -92,25 +102,21 @@ export function coreColorsFor({ typeId, cores, coreColor }) {
     return [{ id: opt.id, label: opt.label, color: opt.color }];
   }
 
-  const L = [
-    { id: "l1", label: "L1", color: 0x8b5a2b },
-    { id: "l2", label: "L2", color: 0x1a1a1a },
-    { id: "l3", label: "L3", color: 0x808080 },
-  ];
-  const N = { id: "n", label: "N", color: 0x1f6fb2 };
-  const PE = { id: "pe", label: "PE", color: 0xc7a81a };
-
-  if (!type.hasPe) {
-    if (cores === 2) return [L[0], N];
-    if (cores === 3) return [L[0], L[1], N];
-    if (cores === 4) return [L[0], L[1], L[2], N];
-    return [...L, N, { id: "l4", label: "L4", color: 0x6b4423 }];
+  if (cores === 7) {
+    return [
+      { ...CORE_GNGE },
+      ...[1, 2, 3, 4, 5, 6].map((n) => ({
+        id: `schwarz-${n}`,
+        label: `schwarz ${n}`,
+        color: 0x1a1a1a,
+        mark: String(n),
+      })),
+    ];
   }
-
-  if (cores === 2) return [L[0], PE];
-  if (cores === 3) return [L[0], N, PE];
-  if (cores === 4) return [L[0], L[1], N, PE];
-  return [L[0], L[1], L[2], N, PE];
+  if (cores === 2) return [{ ...CORE_BLAU }, { ...CORE_BRAUN }];
+  if (cores === 3) return [{ ...CORE_BLAU }, { ...CORE_GNGE }, { ...CORE_BRAUN }];
+  if (cores === 4) return [{ ...CORE_BLAU }, { ...CORE_GNGE }, { ...CORE_BRAUN }, { ...CORE_SCHWARZ }];
+  return [{ ...CORE_BLAU }, { ...CORE_GNGE }, { ...CORE_BRAUN }, { ...CORE_SCHWARZ }, { ...CORE_GRAU }];
 }
 
 /** Mantelfarbe für die 3D-Leitung. Einzelader folgt der gewählten Aderfarbe. */
