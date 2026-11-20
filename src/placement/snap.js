@@ -5,6 +5,7 @@ import {
   UV,
 } from "../layout.js";
 import { GRID_PITCH, MM, TE, toMm } from "../units.js";
+import { railLetter as letterForRow } from "./uvRails.js";
 
 /**
  * Snap a world coordinate to the 50 mm Lochblech raster.
@@ -42,12 +43,25 @@ export function snapToAbutting(localX, widthM, railLength = UV.railLength) {
   return Math.min(max, Math.max(min, stepped));
 }
 
-export function formatSnapFeedback({ face, xMm, yMm, zMm, teIndex, teWidth, mount, widthMm, abutting, exact }) {
+export function formatSnapFeedback({
+  face,
+  xMm,
+  yMm,
+  zMm,
+  teIndex,
+  teWidth,
+  mount,
+  widthMm,
+  abutting,
+  exact,
+  railLetter,
+}) {
+  const rail = railLetter ? `Schiene ${railLetter}` : "Hutschiene";
   if (mount === "din" && abutting && widthMm != null) {
-    return `Hutschiene · bündig ${widthMm} mm · Pos. ${teIndex != null ? teIndex + 1 : "–"}`;
+    return `${rail} · bündig ${widthMm} mm · Pos. ${teIndex != null ? teIndex + 1 : "–"}`;
   }
   if (mount === "din" && teIndex != null) {
-    return `Hutschiene · TE ${teIndex + 1}${teWidth > 1 ? `–${teIndex + teWidth}` : ""} · ${teWidth} TE`;
+    return `${rail} · TE ${teIndex + 1}${teWidth > 1 ? `–${teIndex + teWidth}` : ""} · ${teWidth} TE`;
   }
   const parts = [];
   if (face) parts.push(faceLabel(face));
@@ -224,12 +238,13 @@ export function nearestFreeDinX(localX, widthM, railLength, spans, abutting = fa
 
 /**
  * Rail-local seat shared by every DIN device (drop, measure, and plan).
- * Y keeps the 90 mm body on the cover slot (slot centre is 50 mm above the rail).
+ * Y = 0: device models centre their 90 mm body on the Hutschiene (clip at the
+ * rail), matching a real DIN mount. Cover openings are centred on the rails.
  * Z puts the modular face (local +36.3 mm) on the cover's inner plane, 65.15 mm
  * ahead of the rail back, so the clip and foot meet the hat lip instead of
  * passing through the rail or floating in front of it.
  */
-export const DIN_RAIL_MOUNT_Y = 6 * MM;
+export const DIN_RAIL_MOUNT_Y = 0;
 export const DIN_RAIL_MOUNT_Z = 28.85 * MM;
 
 /**
@@ -264,6 +279,7 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
     }
   }
 
+  const railLetter = letterForRow(railGroup?.userData?.rowIndex);
   return {
     position: { x, y: DIN_RAIL_MOUNT_Y, z: DIN_RAIL_MOUNT_Z },
     rotation: { x: 0, y: 0, z: 0 },
@@ -274,6 +290,7 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
       teWidth: abutting ? null : teWidth,
       widthMm: abutting ? opts.widthMm ?? toMm(widthM) : null,
       abutting: !!abutting,
+      railLetter,
     }),
     face: "din",
     mount: "din",
@@ -281,6 +298,8 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
     teWidth: abutting ? null : teWidth,
     widthM,
     abutting: !!abutting,
+    railLetter,
+    rowIndex: railGroup?.userData?.rowIndex,
   };
 }
 

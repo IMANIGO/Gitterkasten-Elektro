@@ -11,12 +11,13 @@ import * as THREE from "three";
 import { applyStationSlots, STATION_SLOT_OPTIONS } from "../models/controlStation.js";
 import { setDistributionCoverVisible } from "../models/distributionBoard.js";
 import {
-  dinMeasureFromLocal,
+  dinTeFromLocal,
   measureLabels,
   panelMeasuresFromWorld,
-  poseFromDinMeasure,
+  poseFromDinTe,
   poseFromPanelMeasures,
 } from "../placement/measures.js";
+import { railLabel, UV_RAIL_LETTERS } from "../placement/uvRails.js";
 import { inferFaceFromWorld } from "../plans/planFromWorld.js";
 import { applyMcbSpec, MCB_FIELDS, mcbSpecFromFields, mcbSpecKey } from "../models/mcbSpec.js";
 import { applyRcdSpec, RCD_FIELDS, rcdSpecFromFields, rcdSpecKey } from "../models/rcdSpec.js";
@@ -696,31 +697,71 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   const measurePlace = document.getElementById("measure-place");
   const moveForm = document.getElementById("measure-move");
 
+  function sortedDinRails() {
+    const rails = [...(selection?.listDinRails?.() || [])];
+    rails.sort((a, b) => (a.userData?.rowIndex ?? 0) - (b.userData?.rowIndex ?? 0));
+    return rails;
+  }
+
+  function fillRailSelect(select, preferredUuid) {
+    if (!select) return;
+    const rails = sortedDinRails();
+    select.innerHTML = rails
+      .map((rail) => {
+        const letter =
+          rail.userData?.railLetter || UV_RAIL_LETTERS[rail.userData?.rowIndex] || "?";
+        const label = rail.userData?.name || railLabel(rail.userData?.rowIndex);
+        return `<option value="${rail.uuid}">${label} (${letter})</option>`;
+      })
+      .join("");
+    if (preferredUuid && rails.some((rail) => rail.uuid === preferredUuid)) {
+      select.value = preferredUuid;
+    }
+  }
+
   function applyMeasureLabels(prefix, face) {
     const labels = measureLabels(face);
     const aLabel = document.getElementById(`${prefix}-a-label`);
     const bWrap = document.getElementById(`${prefix}-b-wrap`);
     const bLabel = document.getElementById(`${prefix}-b-label`);
+    const railWrap = document.getElementById(`${prefix}-rail-wrap`);
+    const title = document.getElementById(`${prefix}-form-title`);
+    const button = document.getElementById(
+      prefix === "place" ? "btn-place-measure" : "btn-move-measure",
+    );
     if (aLabel) aLabel.textContent = labels.a;
     if (bWrap) bWrap.hidden = !labels.b;
     if (bLabel && labels.b) bLabel.textContent = labels.b;
+    if (railWrap) railWrap.hidden = face !== "din";
+    if (face === "din") {
+      if (title) title.textContent = prefix === "place" ? "In der Verteilung platzieren" : "In der Verteilung setzen";
+      if (button) button.textContent = prefix === "place" ? "An Schiene/TE platzieren" : "An Schiene/TE setzen";
+    } else {
+      if (title) title.textContent = prefix === "place" ? "Maß platzieren" : "Maß";
+      if (button) button.textContent = prefix === "place" ? "An Maß platzieren" : "An Maß setzen";
+    }
   }
 
-  /** Lochblech stays on the back wall; a rail device uses the first DIN row. */
+  /** Lochblech stays on the back wall; DIN devices use the chosen Schiene. */
   function placeTarget(item) {
     if (item?.mount === "din") {
-      const rails = selection?.listDinRails?.() || [];
-      return { face: "din", rail: rails[0] || null };
+      const rails = sortedDinRails();
+      const selectedUuid = document.getElementById("place-rail")?.value;
+      const rail = rails.find((entry) => entry.uuid === selectedUuid) || rails[0] || null;
+      return { face: "din", rail };
     }
     return { face: "back", rail: null };
   }
 
-  /** Keep the face and, on a rail, the row the device already occupies. */
+  /** Keep the face and, on a rail, allow changing Schiene via the select. */
   function moveTarget(object) {
     const railParent = object.parent?.userData?.mount === "din" ? object.parent : null;
     const stored = object.userData?.placement;
     if (railParent || stored?.face === "din" || stored?.mount === "din") {
-      return { face: "din", rail: railParent };
+      const rails = sortedDinRails();
+      const selectedUuid = document.getElementById("move-rail")?.value;
+      const rail = rails.find((entry) => entry.uuid === selectedUuid) || railParent || rails[0] || null;
+      return { face: "din", rail };
     }
     const world = new THREE.Vector3();
     object.getWorldPosition(world);
@@ -733,7 +774,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     const a = Number(document.getElementById(`${prefix}-a`)?.value);
     const b = Number(document.getElementById(`${prefix}-b`)?.value);
     if (!Number.isFinite(a) || (face !== "din" && !Number.isFinite(b))) {
-      setState({ placementFeedback: "Maß fehlt" });
+      setState({ placementFeedback: face === "din" ? "TE fehlt" : "Maß fehlt" });
       return null;
     }
     if (face === "din") {
@@ -741,7 +782,7 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
         setState({ placementFeedback: "Keine Hutschiene im Aufbau" });
         return null;
       }
-      return poseFromDinMeasure(target.rail, a, item);
+      return poseFromDinTe(target.rail, a, item);
     }
     return poseFromPanelMeasures(face, a, b, itemDepthM(item));
   }
@@ -750,15 +791,19 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
     const object = selection?.getSelected?.();
     if (!moveForm || !object) return;
     if (moveForm.contains(document.activeElement)) return;
-    const target = moveTarget(object);
-    applyMeasureLabels("move", target.face);
-    if (target.face === "din") {
-      if (!target.rail) return;
+    const railParent = object.parent?.userData?.mount === "din" ? object.parent : null;
+    const stored = object.userData?.placement;
+    const isDin = !!(railParent || stored?.face === "din" || stored?.mount === "din");
+    applyMeasureLabels("move", isDin ? "din" : moveTarget(object).face);
+    if (isDin) {
+      fillRailSelect(document.getElementById("move-rail"), railParent?.uuid);
+      const item = getCatalogItem(object.userData?.catalogId);
       document.getElementById("move-a").value = String(
-        dinMeasureFromLocal(object.position.x, target.rail.userData.railLength),
+        dinTeFromLocal(object.position.x, item, railParent?.userData?.railLength),
       );
       return;
     }
+    const target = moveTarget(object);
     const world = new THREE.Vector3();
     object.getWorldPosition(world);
     const measures = panelMeasuresFromWorld(target.face, world);
@@ -769,7 +814,15 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
   function syncPlaceForm() {
     const item = getCatalogItem(state.selectedCatalogId);
     if (!item) return;
-    applyMeasureLabels("place", placeTarget(item).face);
+    const face = item.mount === "din" ? "din" : "back";
+    applyMeasureLabels("place", face);
+    if (face === "din") {
+      fillRailSelect(document.getElementById("place-rail"));
+      const current = Number(document.getElementById("place-a")?.value);
+      if (!Number.isFinite(current) || current < 1 || current > 200) {
+        document.getElementById("place-a").value = "1";
+      }
+    }
   }
 
   applyMeasureLabels("move", "back");
@@ -964,8 +1017,8 @@ export function bindUi({ applyPreset, takeoff, selection, plansApi }) {
         next.selectionAction === "replace"
           ? "Ersatz wählen, dann Montagepunkt anklicken"
           : next.selectionAction === "move"
-            ? "Ziehen, neue Stelle anklicken oder Maß eintragen"
-            : "Artikel wählen → platzieren (Auswahl springt zurück) · Bauteil anklicken zum Bearbeiten";
+            ? "Ziehen, neue Stelle anklicken oder Schiene/TE bzw. Maß eintragen"
+            : "Artikel wählen → auf Fläche/Schiene klicken · in der UV auch Schiene A–C und TE";
       libraryBody.hidden = false;
       [...libraryBody.querySelectorAll(".catalog-item")].forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.catalogId === next.selectedCatalogId);

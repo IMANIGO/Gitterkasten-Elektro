@@ -1,6 +1,7 @@
 import { EBOX, EBOX_FLOOR_Y, PANEL_INNER, UV } from "../layout.js";
-import { MM, toMm } from "../units.js";
+import { MM, TE, toMm } from "../units.js";
 import { poseOnDinRail, poseOnLochblech } from "./snap.js";
+import { railLabel, railLetter } from "./uvRails.js";
 
 const INNER_LEFT = -PANEL_INNER.backW / 2;
 const INNER_BOTTOM = EBOX_FLOOR_Y + EBOX.frame;
@@ -16,7 +17,7 @@ export const MEASURE_FACES = [
 export function measureLabels(face) {
   if (face === "floor") return { a: "Von links", b: "Von der Rückwand" };
   if (face === "left" || face === "right") return { a: "Von der Rückwand", b: "Von unten" };
-  if (face === "din") return { a: "Mitte von links auf der Schiene", b: null };
+  if (face === "din") return { a: "Erste Teilungseinheit (TE)", b: null };
   return { a: "Von links", b: "Von unten" };
 }
 
@@ -49,9 +50,17 @@ export function panelMeasuresFromWorld(face, world) {
   return { a: 0, b: 0 };
 }
 
-export function poseFromDinMeasure(rail, fromLeftMm, item) {
+/**
+ * Place a DIN device by 1-based TE start index (left edge of the module).
+ * Abutting terminals keep the same index scale as modular TE slots.
+ */
+export function poseFromDinTe(rail, teStart, item) {
   const railLength = rail?.userData?.railLength || UV.railLength;
-  const localX = -railLength / 2 + Number(fromLeftMm) * MM;
+  const teWidth = item?.abutting ? 1 : item?.te || 1;
+  const widthM = item?.abutting && item.widthMm ? item.widthMm * MM : teWidth * TE;
+  const half = widthM / 2;
+  const index = Math.max(0, Math.round(Number(teStart) || 1) - 1);
+  const localX = -railLength / 2 + half + index * (item?.abutting ? widthM : TE);
   const pose = poseOnDinRail(
     rail,
     { x: localX, y: 0, z: 0 },
@@ -64,8 +73,32 @@ export function poseFromDinMeasure(rail, fromLeftMm, item) {
       widthMm: item?.widthMm,
     },
   );
-  pose.feedback = `Hutschiene · Mitte ${Math.round(Number(fromLeftMm))} mm von links`;
+  if (!pose) return null;
+  const letter = railLetter(rail?.userData?.rowIndex);
+  const start = (pose.teIndex ?? index) + 1;
+  const widthTe = item?.abutting ? null : item?.te || 1;
+  pose.feedback = item?.abutting
+    ? `${railLabel(rail?.userData?.rowIndex)} · Pos. ${start}`
+    : `${railLabel(rail?.userData?.rowIndex)} · TE ${start}${
+        widthTe > 1 ? `–${start + widthTe - 1}` : ""
+      } · ${widthTe} TE`;
+  pose.railLetter = letter;
   return pose;
+}
+
+/** @deprecated Use poseFromDinTe — kept for older tests that spoke millimetres. */
+export function poseFromDinMeasure(rail, fromLeftMm, item) {
+  const railLength = rail?.userData?.railLength || UV.railLength;
+  const widthM = item?.abutting && item.widthMm ? item.widthMm * MM : (item?.te || 1) * TE;
+  const teStart = Math.round((Number(fromLeftMm) * MM - widthM / 2) / TE) + 1;
+  return poseFromDinTe(rail, teStart, item);
+}
+
+export function dinTeFromLocal(localX, item, railLength = UV.railLength) {
+  const widthM = item?.abutting && item.widthMm ? item.widthMm * MM : (item?.te || 1) * TE;
+  const half = widthM / 2;
+  const step = item?.abutting ? widthM : TE;
+  return Math.max(1, Math.round((localX - (-railLength / 2 + half)) / step) + 1);
 }
 
 export function dinMeasureFromLocal(localX, railLength = UV.railLength) {

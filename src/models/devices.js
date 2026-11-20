@@ -115,6 +115,7 @@ function addConductorEntry(group, { yHole, yPush, zFront, ghost }) {
 function createDoubleDeckTerminal({ id, name, meta, colorMat, pe = false, ghost = false }) {
   const widthMm = 5.2;
   const width = widthMm * MM;
+  const height = 66 * MM;
   const g = new THREE.Group();
   g.name = name;
 
@@ -130,13 +131,23 @@ function createDoubleDeckTerminal({ id, name, meta, colorMat, pe = false, ghost 
   markerFace.position.set(0, 60.4 * MM, 15.35 * MM);
   g.add(markerTop, markerFace);
 
-  addHousingBox(g, width * 0.98, 9 * MM, 11 * MM, 0, 0, -18 * MM, colorMat, { pe, ghost });
+  const footGroup = new THREE.Group();
+  footGroup.name = "din-foot";
+  addHousingBox(footGroup, width * 0.98, 9 * MM, 11 * MM, 0, 0, -18 * MM, colorMat, { pe, ghost });
   const clip = mesh(
     new THREE.BoxGeometry(width * 0.92, 3.5 * MM, 7 * MM),
     paint(materials.din, ghost),
   );
   clip.position.set(0, -2 * MM, -22 * MM);
-  g.add(clip);
+  footGroup.add(clip);
+  g.add(footGroup);
+
+  // Centre the body on the Hutschiene; keep foot/clip on the rail.
+  const offset = -height / 2;
+  for (const child of g.children) {
+    if (child.name === "din-foot") continue;
+    child.position.y += offset;
+  }
 
   if (!ghost) {
     g.userData = {

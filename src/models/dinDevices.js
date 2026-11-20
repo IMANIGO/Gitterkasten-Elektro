@@ -37,12 +37,25 @@ function mesh(geo, mat) {
 
 function dinFoot(width) {
   const g = new THREE.Group();
+  g.name = "din-foot";
   const foot = mesh(new THREE.BoxGeometry(width, 8 * MM, 10 * MM), materials.plasticBlack);
   foot.position.set(0, 0, -18 * MM);
   const clip = mesh(new THREE.BoxGeometry(width * 0.9, 3 * MM, 6 * MM), materials.din);
   clip.position.set(0, -2 * MM, -22 * MM);
   g.add(foot, clip);
   return g;
+}
+
+/**
+ * Bodies are modelled with the foot at y = 0. Shift non-foot parts so the
+ * Hutschiene (local y = 0) runs through mid-height, as on a real DIN device.
+ */
+function centerBodyOnRail(root, height) {
+  const offset = -height / 2;
+  for (const child of root.children) {
+    if (child.name === "din-foot") continue;
+    child.position.y += offset;
+  }
 }
 
 /**
@@ -73,6 +86,7 @@ export function createDinDevice({
     );
     body.position.set(0, height / 2, depth / 2 - 22 * MM);
     root.add(body, dinFoot(width - 1 * MM));
+    centerBodyOnRail(root, height);
     root.userData.ghost = true;
     return root;
   }
@@ -86,6 +100,7 @@ export function createDinDevice({
   }
 
   root.add(dinFoot(width - 1 * MM));
+  centerBodyOnRail(root, height);
   if (ghost) {
     root.userData = { ghost: true };
     return root;
@@ -475,6 +490,7 @@ export function createImpulseRelay({ ghost = false } = {}) {
   root.add(dinFoot(width - 1 * MM));
 
   if (ghost) {
+    centerBodyOnRail(root, height);
     root.userData = { ghost: true };
     return root;
   }
@@ -485,6 +501,7 @@ export function createImpulseRelay({ ghost = false } = {}) {
   const volts = makeTextPlate("250 V", 13, 4.2, { bg: "#d7d3ca", fg: "#2a2c28", size: 72 });
   volts.position.set(0, height * 0.22, frontZ + 0.2 * MM);
   root.add(volts);
+  centerBodyOnRail(root, height);
 
   root.userData = {
     pickable: true,
@@ -571,6 +588,7 @@ export function createContactor({ ghost = false } = {}) {
 
   root.add(dinFoot(width - 1 * MM));
   if (ghost) {
+    centerBodyOnRail(root, height);
     root.userData = { ghost: true };
     return root;
   }
@@ -582,6 +600,7 @@ export function createContactor({ ghost = false } = {}) {
   const coilLabel = makeTextPlate("24 V", 16, 5.5, { bg: "#f3f4f6", fg: "#2a2c28", size: 80 });
   coilLabel.position.set(-2 * MM, height * 0.3, frontZ + 0.25 * MM);
   root.add(amps, power, coilLabel);
+  centerBodyOnRail(root, height);
 
   root.userData = {
     pickable: true,

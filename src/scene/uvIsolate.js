@@ -22,8 +22,28 @@ function isDistributionBoard(object) {
   return data.kind === "distributionBoard" || data.catalogId === "uv-3reihen";
 }
 
-/** Geometry-only copy. Shared materials, no placement userData, no raycast. */
-function visualClone(source) {
+function isInteractiveSource(source) {
+  const data = source?.userData || {};
+  if (data.mount === "din") return true;
+  if (data.placed || data.selectable) return true;
+  if (
+    data.kind === "dinDevice" ||
+    data.kind === "terminal" ||
+    data.kind === "surfaceDevice" ||
+    data.kind === "junctionBox" ||
+    data.kind === "cableClamp" ||
+    data.kind === "clamp"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Geometry copy with pick proxies for DIN rails and placed devices.
+ * Interactive nodes keep raycast and point back to the real source uuid.
+ */
+function visualClone(source, maps) {
   let clone;
   if (source.isMesh) clone = new THREE.Mesh(source.geometry, source.material);
   else if (source.isLineSegments) clone = new THREE.LineSegments(source.geometry, source.material);
@@ -43,20 +63,59 @@ function visualClone(source) {
   clone.frustumCulled = source.frustumCulled;
   clone.matrixAutoUpdate = source.matrixAutoUpdate !== false;
   if (source.matrixAutoUpdate === false) clone.matrix.copy(source.matrix);
-  clone.raycast = () => {};
-  for (const child of source.children) clone.add(visualClone(child));
+
+  maps.sourceToDisplay.set(source.uuid, clone);
+  maps.displayToSource.set(clone.uuid, source);
+
+  // Keep raycasts so Betriebsmittel can be placed/selected in UV-Ansicht.
+  // Controllers remap hits from the display copy onto the real board.
+  if (isInteractiveSource(source)) {
+    clone.userData = {
+      ...source.userData,
+      uvViewDisplay: true,
+      uvSourceUuid: source.uuid,
+      pickable: true,
+    };
+    if (source.userData?.mount === "din") {
+      maps.displayRailsByRow.set(source.userData.rowIndex, clone);
+      maps.sourceRailsByRow.set(source.userData.rowIndex, source);
+    }
+  } else {
+    clone.userData = {
+      ...(source.userData || {}),
+      uvViewDisplay: true,
+      uvSourceUuid: source.uuid,
+      pickable: false,
+    };
+  }
+
+  for (const child of source.children) clone.add(visualClone(child, maps));
   return clone;
 }
 
 function structureKey(object) {
   let count = 0;
   let sig = 0;
+  let content = "";
   object.traverse((child) => {
     count += 1;
     sig += child.position.x * 12.9898 + child.position.y * 78.233 + child.position.z * 37.719;
     sig += child.quaternion.x + child.quaternion.y + child.quaternion.z + child.quaternion.w;
+    const data = child.userData || {};
+    if (data.name) content += data.name;
+    if (data.mcbSpec) content += `m${data.mcbSpec.curve}${data.mcbSpec.amps}`;
+    if (data.rcboSpec) {
+      content += `r${data.rcboSpec.curve}${data.rcboSpec.amps}${data.rcboSpec.ma}${data.rcboSpec.fiType}`;
+    }
+    if (data.rcdSpec) content += `d${data.rcdSpec.amps}${data.rcdSpec.ma}${data.rcdSpec.fiType}`;
+    if (child.isMesh) {
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) {
+        if (mat?.map?.uuid) content += mat.map.uuid;
+      }
+    }
   });
-  return `${count}:${sig.toFixed(5)}`;
+  return `${count}:${sig.toFixed(5)}:${content}`;
 }
 
 function placementKey(object) {
@@ -81,6 +140,10 @@ export function createUvIsolate({ scene, placedRoot }) {
    *   placementKey: string,
    *   clone: import("three").Object3D | null,
    *   key: string,
+   *   sourceToDisplay: Map<string, import("three").Object3D>,
+   *   displayToSource: Map<string, import("three").Object3D>,
+   *   displayRailsByRow: Map<number, import("three").Object3D>,
+   *   sourceRailsByRow: Map<number, import("three").Object3D>,
    * }} */
   let session = null;
 
@@ -110,7 +173,13 @@ export function createUvIsolate({ scene, placedRoot }) {
 
   function showDisplay(source) {
     removeDisplay();
-    const clone = visualClone(source);
+    const maps = {
+      sourceToDisplay: new Map(),
+      displayToSource: new Map(),
+      displayRailsByRow: new Map(),
+      sourceRailsByRow: new Map(),
+    };
+    const clone = visualClone(source, maps);
     clone.name = "UV-Ansicht-Modell";
     clone.position.copy(UV_STAGE.position);
     clone.rotation.set(0, 0, 0);
@@ -120,6 +189,10 @@ export function createUvIsolate({ scene, placedRoot }) {
     display.add(clone);
     session.clone = clone;
     session.key = structureKey(source);
+    session.sourceToDisplay = maps.sourceToDisplay;
+    session.displayToSource = maps.displayToSource;
+    session.displayRailsByRow = maps.displayRailsByRow;
+    session.sourceRailsByRow = maps.sourceRailsByRow;
     syncCover();
   }
 
@@ -134,6 +207,10 @@ export function createUvIsolate({ scene, placedRoot }) {
       placementKey: placementKey(source),
       clone: null,
       key: "",
+      sourceToDisplay: new Map(),
+      displayToSource: new Map(),
+      displayRailsByRow: new Map(),
+      sourceRailsByRow: new Map(),
     };
   }
 
@@ -195,6 +272,105 @@ export function createUvIsolate({ scene, placedRoot }) {
     return null;
   }
 
+  function resolveDisplayObject(object) {
+    if (!session) return null;
+    let current = object;
+    while (current) {
+      if (current === session.clone || current.userData?.uvViewDisplay) {
+        const source = session.displayToSource.get(current.uuid);
+        if (source) return source;
+      }
+      if (current.userData?.uvSourceUuid) {
+        const source = session.displayToSource.get(current.uuid);
+        if (source) return source;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
+  function isPlacedDevice(object) {
+    let current = object;
+    while (current && current !== session?.source) {
+      const data = current.userData || {};
+      if (data.mount === "din") return false;
+      if (
+        data.placed ||
+        data.selectable ||
+        data.kind === "dinDevice" ||
+        data.kind === "terminal" ||
+        data.kind === "surfaceDevice" ||
+        data.kind === "junctionBox" ||
+        data.kind === "cableClamp" ||
+        data.kind === "clamp"
+      ) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  /** Map a raycast hit on the display copy onto the real board / rail. */
+  function remapHit(hit) {
+    if (!session || !hit) return hit;
+    let current = hit.object;
+    let underDisplay = false;
+    while (current) {
+      if (current === session.clone) {
+        underDisplay = true;
+        break;
+      }
+      current = current.parent;
+    }
+    if (!underDisplay) return hit;
+
+    const real = resolveDisplayObject(hit.object);
+    // Prefer the Betriebsmittel itself — do not collapse device hits onto the parent rail.
+    if (real && isPlacedDevice(real)) {
+      const local = hit.object.worldToLocal(hit.point.clone());
+      const point = real.localToWorld(local.clone());
+      return {
+        ...hit,
+        object: real,
+        point,
+        uvRemapped: true,
+      };
+    }
+
+    let displayRail = hit.object;
+    while (displayRail && displayRail.userData?.mount !== "din") {
+      displayRail = displayRail.parent;
+      if (displayRail === session.clone) {
+        displayRail = null;
+        break;
+      }
+    }
+
+    if (displayRail && displayRail.userData?.mount === "din") {
+      const rowIndex = displayRail.userData.rowIndex;
+      const realRail = session.sourceRailsByRow.get(rowIndex) || session.displayToSource.get(displayRail.uuid);
+      if (!realRail) return hit;
+      const local = displayRail.worldToLocal(hit.point.clone());
+      const point = realRail.localToWorld(local.clone());
+      return {
+        ...hit,
+        object: realRail,
+        point,
+        displayRail,
+        realRail,
+        uvRemapped: true,
+      };
+    }
+
+    if (!real) return hit;
+    return {
+      ...hit,
+      object: real,
+      uvRemapped: true,
+    };
+  }
+
   return {
     enter,
     leave,
@@ -203,6 +379,15 @@ export function createUvIsolate({ scene, placedRoot }) {
     isActive: () => !!session,
     getSource: () => session?.source || null,
     getDisplay: () => session?.clone || null,
+    getDisplayRoot: () => (session?.clone ? display : null),
+    remapHit,
+    resolveDisplayObject,
+    displayRailFor(rowIndex) {
+      return session?.displayRailsByRow.get(rowIndex) || null;
+    },
+    sourceRailFor(rowIndex) {
+      return session?.sourceRailsByRow.get(rowIndex) || null;
+    },
     stage: UV_STAGE,
     /** Local pose captured when the view opened. Null when the view is closed. */
     getHomePose: () => {
