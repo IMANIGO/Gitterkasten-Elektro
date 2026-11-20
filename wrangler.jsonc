@@ -3,6 +3,7 @@
   "name": "gitterkasten-elektro",
   // Set this to today's date
   "compatibility_date": "2026-11-20",
+  "main": "./worker/index.js",
   "workers_dev": true,
   "preview_urls": true,
   "routes": [
@@ -13,6 +14,7 @@
   ],
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
   "observability": {
