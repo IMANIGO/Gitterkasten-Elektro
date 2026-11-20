@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="de" translate="no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>E-Box · Digitaler 3D-Gitterkasten GP1–GP2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="viewport"></canvas>
+
+    <div id="ui">
+      <header class="topbar">
+        <div class="brand">
+          <p class="kicker">Elektro-Prüfungssimulator</p>
+          <h1>E-Box</h1>
+          <p class="subtitle">3D-Gitterkasten · GP1–GP2</p>
+        </div>
+        <nav class="presets" aria-label="Kamerapresets">
+          <button type="button" data-preset="gesamt" class="active">Gesamtansicht</button>
+          <button type="button" data-preset="uv" disabled title="Keine Unterverteilung platziert">UV-Ansicht</button>
+          <button type="button" data-preset="draufsicht">Draufsicht</button>
+        </nav>
+      </header>
+
+      <div class="modebar" role="tablist" aria-label="Arbeitsmodus">
+        <button type="button" class="active" data-mode="ansicht">Ansicht</button>
+        <button type="button" data-mode="betriebsmittel">Betriebsmittel</button>
+        <button type="button" data-mode="verdrahtung">Verdrahtung</button>
+        <button type="button" data-mode="plaene">Pläne</button>
+        <button type="button" data-mode="aufmass">Aufmaß</button>
+      </div>
+
+      <aside class="library-panel" id="library-panel" hidden>
+        <header class="library-head">
+          <p class="kicker">Bibliothek</p>
+          <h2 id="library-title">Betriebsmittel</h2>
+          <p class="library-hint" id="library-hint">Artikel wählen, dann auf Lochblech / Hutschiene klicken</p>
+          <label class="library-search" id="library-search">
+            <span>Suche</span>
+            <input id="library-query" type="search" placeholder="Name, auch mit Tippfehler" autocomplete="off" spellcheck="false" />
+          </label>
+          <div class="library-view" id="library-view" role="group" aria-label="Darstellung">
+            <button type="button" data-library-view="list" class="active">Liste</button>
+            <button type="button" data-library-view="tiles">Kacheln</button>
+          </div>
+        </header>
+        <div class="cable-form" id="cable-form" hidden>
+          <label>
+            Leitungstyp
+            <select id="cable-type"></select>
+          </label>
+          <label>
+            Querschnitt
+            <select id="cable-mm2"></select>
+          </label>
+          <label>
+            Adern
+            <select id="cable-cores"></select>
+          </label>
+          <label id="cable-color-label" hidden>
+            Aderfarbe
+            <select id="cable-color"></select>
+          </label>
+          <label id="cable-circuit-label" hidden>
+            Verlauf in der UV
+            <select id="cable-circuit">
+              <option value="last">Laststrom links</option>
+              <option value="steuer">Steuerkreis rechts</option>
+            </select>
+          </label>
+          <p class="cable-preview" id="cable-preview"></p>
+        </div>
+        <div class="library-body" id="library-body"></div>
+        <footer class="library-foot">
+          <p id="placement-feedback" class="feedback"></p>
+        </footer>
+      </aside>
+
+      <aside class="setup-column" id="setup-column">
+        <div class="station-setup" id="station-setup" hidden></div>
+        <div class="station-setup" id="rcbo-setup" hidden></div>
+        <div class="station-setup" id="mcb-setup" hidden></div>
+        <div class="station-setup" id="rcd-setup" hidden></div>
+        <form class="measure-form" id="measure-place" hidden>
+          <p>Maß platzieren</p>
+          <label><span id="place-a-label">Von links</span>
+            <input id="place-a" type="number" step="1" value="200" />
+          </label>
+          <label id="place-b-wrap"><span id="place-b-label">Von unten</span>
+            <input id="place-b" type="number" step="1" value="300" />
+          </label>
+          <button type="button" id="btn-place-measure">An Maß platzieren</button>
+        </form>
+      </aside>
+
+      <aside class="selection-card" id="selection-card" hidden>
+        <p class="kicker">Auswahl</p>
+        <p class="name" id="selection-name"></p>
+        <p class="meta" id="selection-dims"></p>
+        <div class="station-setup" id="station-edit" hidden></div>
+        <div class="station-setup" id="rcbo-edit" hidden></div>
+        <div class="station-setup" id="mcb-edit" hidden></div>
+        <div class="station-setup" id="rcd-edit" hidden></div>
+        <form class="measure-form" id="measure-move">
+          <p>Maß</p>
+          <label><span id="move-a-label">Von links</span>
+            <input id="move-a" type="number" step="1" />
+          </label>
+          <label id="move-b-wrap"><span id="move-b-label">Von unten</span>
+            <input id="move-b" type="number" step="1" />
+          </label>
+          <button type="button" id="btn-move-measure">An Maß setzen</button>
+        </form>
+        <label class="cover-toggle" id="cover-toggle" hidden>
+          <input type="checkbox" id="cover-visible" />
+          Abdeckung
+        </label>
+        <div class="selection-actions">
+          <button type="button" id="btn-move">Verschieben</button>
+          <button type="button" id="btn-replace">Austauschen</button>
+          <button type="button" id="btn-delete" class="danger">Löschen</button>
+        </div>
+      </aside>
+
+      <aside class="hover-card" id="hover-card" hidden>
+        <p class="kicker">Zeiger</p>
+        <p class="name" id="hover-name"></p>
+        <p class="meta" id="hover-meta"></p>
+      </aside>
+
+      <aside class="takeoff-card" id="takeoff-card" hidden>
+        <p class="kicker">Aufmaß</p>
+        <p class="name" id="takeoff-summary"></p>
+        <p class="kicker takeoff-sub">Stückliste</p>
+        <ul id="takeoff-list"></ul>
+        <p class="kicker takeoff-sub">Leitungen</p>
+        <ul id="takeoff-cables"></ul>
+      </aside>
+
+      <aside class="plans-panel" id="plans-panel" hidden>
+        <header class="library-head">
+          <p class="kicker">Dokumentation</p>
+          <h2>Pläne</h2>
+          <p class="library-hint" id="plans-hint">Aufbauplan wird live aus dem 3D-Aufbau erzeugt · Stromlauf · Klemmenliste</p>
+        </header>
+        <div class="plans-toolbar">
+          <select id="plan-select"></select>
+          <button type="button" id="btn-refresh-plan">Aktualisieren</button>
+          <button type="button" id="btn-build-plan">Vorlage in 3D bauen</button>
+          <label class="file-btn">
+            JSON laden
+            <input type="file" id="plan-upload" accept="application/json,.json" hidden />
+          </label>
+          <button type="button" id="btn-export-plan">JSON export</button>
+        </div>
+        <nav class="plan-tabs" aria-label="Plandokument">
+          <button type="button" data-plan-doc="aufbau" class="active">Aufbauplan</button>
+          <button type="button" data-plan-doc="stromlauf">Stromlaufplan</button>
+          <button type="button" data-plan-doc="klemmen">Klemmenliste</button>
+        </nav>
+        <div class="plan-doc" id="plan-doc"></div>
+        <footer class="library-foot">
+          <p class="feedback" id="plan-feedback"></p>
+        </footer>
+      </aside>
+
+      <footer class="statusbar">
+        <span>E-Box 1020 × 510 × 540 mm</span>
+        <span>Lochblech · Raster 50 mm</span>
+        <span>Hutschiene TH35 · TE 18 mm</span>
+        <span id="status-mode">Modus: Ansicht</span>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

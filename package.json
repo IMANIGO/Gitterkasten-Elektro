@@ -1,0 +1,21 @@
+{
+  "name": "pruefwand-gitterkasten",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5173",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:temporary": "npm run build && wrangler deploy --temporary"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1",
+    "vite": "^7.1.12",
+    "wrangler": "^4.165.0"
+  }
+}
