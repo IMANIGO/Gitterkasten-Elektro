@@ -292,7 +292,32 @@ export function createPlacementController({
     const item = getCatalogItem(state.selectedCatalogId);
     if (!item?.placeable) return;
 
-    const pose = resolvePose(item, hitsFromEvent(event)) || lastPose;
+    const hits = hitsFromEvent(event);
+    // Let selection take clicks on existing Betriebsmittel (edit / Charakteristik).
+    for (const hit of hits) {
+      let node = hit.object;
+      while (node) {
+        const data = node.userData || {};
+        if (data.mount === "din") break;
+        if (
+          (data.placed || data.selectable) &&
+          !data.container &&
+          (data.kind === "dinDevice" ||
+            data.kind === "terminal" ||
+            data.kind === "surfaceDevice" ||
+            data.kind === "junctionBox" ||
+            data.kind === "cableClamp" ||
+            data.kind === "clamp" ||
+            data.catalogId)
+        ) {
+          clearGhost();
+          return;
+        }
+        node = node.parent;
+      }
+    }
+
+    const pose = resolvePose(item, hits) || lastPose;
     if (!pose) return;
 
     // Move existing selection

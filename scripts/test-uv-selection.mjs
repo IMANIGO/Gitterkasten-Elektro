@@ -18,10 +18,11 @@ const result = await page.evaluate(async () => {
   const pw = window.__pruefwand;
   const THREE = pw.THREE;
   pw.setState({ mode: "plaene" });
-  const plan = pw.plansApi.listPlans()[0];
+  const plan = pw.plansApi.listPlans().find((p) => p.id === "m6-p01") || pw.plansApi.listPlans()[1];
   const built = pw.plansApi.build(plan);
   pw.applyPreset("uv");
   await new Promise((r) => setTimeout(r, 500));
+  if (!plan) return { error: "no-plan" };
 
   const din = [];
   const terms = [];
@@ -45,9 +46,17 @@ const result = await page.evaluate(async () => {
 
   const canvas = document.getElementById("viewport");
   const rect = canvas.getBoundingClientRect();
+  // Click the UV-Ansicht display copy (real board is hidden off-camera).
+  let displayDevice = null;
+  const displayRoot = pw.uvView?.getDisplay?.();
+  displayRoot?.traverse((o) => {
+    if (!displayDevice && o.userData?.kind === "dinDevice" && o.userData?.uvViewDisplay) {
+      displayDevice = o;
+    }
+  });
+  const target = displayDevice || firstDin;
   const v = new THREE.Vector3();
-  firstDin.getWorldPosition(v);
-  // Nudge toward camera so we hit the device front face
+  target.getWorldPosition(v);
   v.z += 0.04;
   v.project(pw.camera);
   const cx = (v.x * 0.5 + 0.5) * rect.width + rect.left;
@@ -59,6 +68,9 @@ const result = await page.evaluate(async () => {
   );
   canvas.dispatchEvent(
     new PointerEvent("pointerup", { clientX: cx, clientY: cy, button: 0, bubbles: true }),
+  );
+  canvas.dispatchEvent(
+    new PointerEvent("click", { clientX: cx, clientY: cy, button: 0, bubbles: true }),
   );
   await new Promise((r) => setTimeout(r, 200));
 

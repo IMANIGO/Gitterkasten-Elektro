@@ -31,7 +31,7 @@ const click = await page.evaluate(() => {
     if (!rail && object.userData?.mount === "din" && object.userData?.rowIndex === 1) rail = object;
   });
   if (!rail) return { error: "no-rail" };
-  const local = new THREE.Vector3(0, 0.05, 0.02);
+  const local = new THREE.Vector3(0, 0, 0.02);
   const world = rail.localToWorld(local);
   world.project(camera);
   return {

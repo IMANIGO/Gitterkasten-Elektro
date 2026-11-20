@@ -238,12 +238,13 @@ export function nearestFreeDinX(localX, widthM, railLength, spans, abutting = fa
 
 /**
  * Rail-local seat shared by every DIN device (drop, measure, and plan).
- * Y keeps the 90 mm body on the cover slot (slot centre is 50 mm above the rail).
+ * Y = 0: device models centre their 90 mm body on the Hutschiene (clip at the
+ * rail), matching a real DIN mount. Cover openings are centred on the rails.
  * Z puts the modular face (local +36.3 mm) on the cover's inner plane, 65.15 mm
  * ahead of the rail back, so the clip and foot meet the hat lip instead of
  * passing through the rail or floating in front of it.
  */
-export const DIN_RAIL_MOUNT_Y = 6 * MM;
+export const DIN_RAIL_MOUNT_Y = 0;
 export const DIN_RAIL_MOUNT_Z = 28.85 * MM;
 
 /**

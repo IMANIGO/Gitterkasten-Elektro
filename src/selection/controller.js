@@ -194,6 +194,20 @@ export function createSelectionController({
     return containerHit;
   }
 
+  function isEditableDevice(object) {
+    if (!object || object.userData?.container) return false;
+    const data = object.userData || {};
+    return !!(
+      data.placed ||
+      data.kind === "dinDevice" ||
+      data.kind === "terminal" ||
+      data.kind === "surfaceDevice" ||
+      data.kind === "junctionBox" ||
+      data.kind === "cableClamp" ||
+      data.kind === "clamp"
+    );
+  }
+
   function onDown(event) {
     if (event.button !== 0) return;
     downPos = { x: event.clientX, y: event.clientY };
@@ -205,10 +219,13 @@ export function createSelectionController({
     ) {
       return;
     }
-    // A catalog ghost owns the press: first placement stays click-to-place.
-    if (state.selectedCatalogId && state.selectionAction !== "move") return;
     const hit = pickPlaced(event);
-    if (!hit?.userData?.catalogId) return;
+    // While placing, still allow pressing an existing Betriebsmittel (edit in UV).
+    if (state.selectedCatalogId && state.selectionAction !== "move") {
+      if (!isEditableDevice(hit)) return;
+    } else if (!hit?.userData?.catalogId) {
+      return;
+    }
     // Drag only the already selected device, and only after Verschieben.
     if (state.selectionAction === "move" && hit === selected) {
       drag = { object: hit, moved: false };
@@ -230,10 +247,6 @@ export function createSelectionController({
     ) {
       return;
     }
-    // Don't steal clicks while placing a new catalog item (unless moving)
-    if (state.mode === "betriebsmittel" && state.selectedCatalogId && state.selectionAction !== "move") {
-      return;
-    }
     if (downPos) {
       const dragged = Math.hypot(event.clientX - downPos.x, event.clientY - downPos.y) > 8;
       downPos = null;
@@ -246,6 +259,17 @@ export function createSelectionController({
     const keep = keepSelectionOnEmptyClick;
     keepSelectionOnEmptyClick = false;
     const hit = pickPlaced(event);
+    // Placing from the catalog: empty surface stays for placement; a hit on an
+    // existing Betriebsmittel selects it so Charakteristik etc. can be edited.
+    if (state.mode === "betriebsmittel" && state.selectedCatalogId && state.selectionAction !== "move") {
+      if (!isEditableDevice(hit)) return;
+      selectObject(hit);
+      setState({
+        selectedCatalogId: null,
+        placementFeedback: null,
+      });
+      return;
+    }
     if (hit) {
       selectObject(hit);
     } else if (keep) {

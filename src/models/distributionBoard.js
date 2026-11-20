@@ -119,15 +119,15 @@ function createReihenklemme(kind) {
   const g = new THREE.Group();
   const width = kind === "pe" ? 8 * MM : 6.2 * MM;
   const body = mesh(new THREE.BoxGeometry(width, 48 * MM, 42 * MM), mat);
-  body.position.y = 24 * MM;
+  body.position.y = 0;
   const foot = mesh(new THREE.BoxGeometry(width, 10 * MM, 12 * MM), materials.plasticBlack);
   foot.position.set(0, 0, -18 * MM);
   const clip = mesh(new THREE.BoxGeometry(width, 4 * MM, 8 * MM), materials.din);
   clip.position.set(0, -2 * MM, -22 * MM);
   const topScrew = createScrew(1.8 * MM);
-  topScrew.position.set(0, 46 * MM, 8 * MM);
+  topScrew.position.set(0, 22 * MM, 8 * MM);
   const botScrew = createScrew(1.8 * MM);
-  botScrew.position.set(0, 46 * MM, -8 * MM);
+  botScrew.position.set(0, 22 * MM, -8 * MM);
   g.add(body, foot, clip, topScrew, botScrew);
   return g;
 }
@@ -347,7 +347,8 @@ export function createDistributionBoard({
   const firstRailY = innerH / 2 - 168 * MM;
   const rowCenters = [];
   for (let row = 0; row < UV.rows; row += 1) {
-    rowCenters.push(firstRailY - row * UV.railPitch + 50 * MM);
+    // Cover slots centred on the rails — devices sit with the rail mid-body.
+    rowCenters.push(firstRailY - row * UV.railPitch);
   }
 
   if (!ghost) {
@@ -396,11 +397,11 @@ export function createDistributionBoard({
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
     );
     slot.name = "Schienenfeld";
-    slot.position.set(0, 50 * MM, 18 * MM);
+    slot.position.set(0, 0, 18 * MM);
     railGroup.add(slot);
     if (!ghost) {
       const label = makeTextPlate(railLabel(row), 36, 8, { bg: "#2c3034", fg: "#f2f0ea", size: 52 });
-      label.position.set(-UV.railLength / 2 + 22 * MM, 28 * MM, 14 * MM);
+      label.position.set(-UV.railLength / 2 + 22 * MM, -(UV.slotH / 2 + 10 * MM), 14 * MM);
       noRay(label);
       railGroup.add(label);
     }

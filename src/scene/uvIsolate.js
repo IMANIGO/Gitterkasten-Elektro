@@ -96,12 +96,26 @@ function visualClone(source, maps) {
 function structureKey(object) {
   let count = 0;
   let sig = 0;
+  let content = "";
   object.traverse((child) => {
     count += 1;
     sig += child.position.x * 12.9898 + child.position.y * 78.233 + child.position.z * 37.719;
     sig += child.quaternion.x + child.quaternion.y + child.quaternion.z + child.quaternion.w;
+    const data = child.userData || {};
+    if (data.name) content += data.name;
+    if (data.mcbSpec) content += `m${data.mcbSpec.curve}${data.mcbSpec.amps}`;
+    if (data.rcboSpec) {
+      content += `r${data.rcboSpec.curve}${data.rcboSpec.amps}${data.rcboSpec.ma}${data.rcboSpec.fiType}`;
+    }
+    if (data.rcdSpec) content += `d${data.rcdSpec.amps}${data.rcdSpec.ma}${data.rcdSpec.fiType}`;
+    if (child.isMesh) {
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) {
+        if (mat?.map?.uuid) content += mat.map.uuid;
+      }
+    }
   });
-  return `${count}:${sig.toFixed(5)}`;
+  return `${count}:${sig.toFixed(5)}:${content}`;
 }
 
 function placementKey(object) {
@@ -275,6 +289,28 @@ export function createUvIsolate({ scene, placedRoot }) {
     return null;
   }
 
+  function isPlacedDevice(object) {
+    let current = object;
+    while (current && current !== session?.source) {
+      const data = current.userData || {};
+      if (data.mount === "din") return false;
+      if (
+        data.placed ||
+        data.selectable ||
+        data.kind === "dinDevice" ||
+        data.kind === "terminal" ||
+        data.kind === "surfaceDevice" ||
+        data.kind === "junctionBox" ||
+        data.kind === "cableClamp" ||
+        data.kind === "clamp"
+      ) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
   /** Map a raycast hit on the display copy onto the real board / rail. */
   function remapHit(hit) {
     if (!session || !hit) return hit;
@@ -288,6 +324,19 @@ export function createUvIsolate({ scene, placedRoot }) {
       current = current.parent;
     }
     if (!underDisplay) return hit;
+
+    const real = resolveDisplayObject(hit.object);
+    // Prefer the Betriebsmittel itself — do not collapse device hits onto the parent rail.
+    if (real && isPlacedDevice(real)) {
+      const local = hit.object.worldToLocal(hit.point.clone());
+      const point = real.localToWorld(local.clone());
+      return {
+        ...hit,
+        object: real,
+        point,
+        uvRemapped: true,
+      };
+    }
 
     let displayRail = hit.object;
     while (displayRail && displayRail.userData?.mount !== "din") {
@@ -314,7 +363,6 @@ export function createUvIsolate({ scene, placedRoot }) {
       };
     }
 
-    const real = resolveDisplayObject(hit.object);
     if (!real) return hit;
     return {
       ...hit,
