@@ -61,6 +61,7 @@ getCatalog();
 createInteraction(canvas, camera, scene);
 
 let selection = null;
+let uvIsolate = null;
 const placement = createPlacementController({
   canvas,
   camera,
@@ -68,6 +69,7 @@ const placement = createPlacementController({
   placedRoot,
   controls,
   getSelection: () => selection,
+  getUvView: () => uvIsolate,
 });
 
 selection = createSelectionController({
@@ -77,6 +79,7 @@ selection = createSelectionController({
   placedRoot,
   placement,
   controls,
+  getUvView: () => uvIsolate,
 });
 
 const importedPlans = [];
@@ -133,7 +136,7 @@ const plansApi = {
 
 captureLive();
 
-const uvIsolate = createUvIsolate({ scene, placedRoot });
+uvIsolate = createUvIsolate({ scene, placedRoot });
 
 function syncUvButton() {
   const button = document.querySelector('[data-preset="uv"]');
@@ -157,12 +160,6 @@ function applyPreset(id, opts) {
   syncUvButton();
   return true;
 }
-
-const beginMove = selection.beginMove.bind(selection);
-selection.beginMove = () => {
-  if (uvIsolate.isActive()) applyPreset("gesamt");
-  return beginMove();
-};
 
 bindUi({ applyPreset, takeoff, selection, plansApi });
 

@@ -37,11 +37,22 @@ export function createPlacementController({
   placedRoot,
   controls,
   getSelection,
+  getUvView,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   let ghost = null;
   let lastPose = null;
+
+  function uvView() {
+    return typeof getUvView === "function" ? getUvView() : getUvView;
+  }
+
+  function remapHits(hits) {
+    const view = uvView();
+    if (!view?.isActive?.() || !view.remapHit) return hits;
+    return hits.map((hit) => view.remapHit(hit));
+  }
 
   function clearGhost() {
     if (ghost) {
@@ -187,14 +198,16 @@ export function createPlacementController({
 
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(scene.children, true).filter((h) => {
-      let o = h.object;
-      while (o) {
-        if (o.userData?.ghost || o === ghost) return false;
-        o = o.parent;
-      }
-      return true;
-    });
+    const hits = remapHits(
+      raycaster.intersectObjects(scene.children, true).filter((h) => {
+        let o = h.object;
+        while (o) {
+          if (o.userData?.ghost || o === ghost) return false;
+          o = o.parent;
+        }
+        return true;
+      }),
+    );
 
     const pose = resolvePose(item, hits);
     lastPose = pose;
@@ -205,17 +218,21 @@ export function createPlacementController({
       g.visible = false;
       const onRail = hits.some((hit) => findDinRail(hit.object));
       setState({
-        placementFeedback: onRail ? "Diese Reihe ist voll" : "Keine passende Montagefläche",
+        placementFeedback: onRail ? "Diese Schiene ist voll" : "Keine passende Montagefläche",
       });
       return;
     }
 
     g.visible = true;
     if (pose.parent) {
+      const view = uvView();
+      const displayParent =
+        view?.isActive?.() && pose.rowIndex != null ? view.displayRailFor?.(pose.rowIndex) : null;
+      const visualParent = displayParent || pose.parent;
       const worldPos = new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z);
-      pose.parent.localToWorld(worldPos);
+      visualParent.localToWorld(worldPos);
       g.position.copy(worldPos);
-      g.quaternion.copy(pose.parent.getWorldQuaternion(new THREE.Quaternion()));
+      g.quaternion.copy(visualParent.getWorldQuaternion(new THREE.Quaternion()));
     } else {
       if (g.parent !== scene) scene.add(g);
       g.position.set(pose.position.x, pose.position.y, pose.position.z);
@@ -234,7 +251,7 @@ export function createPlacementController({
   function hitsFromEvent(event, ignoreRoot) {
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    return raycaster.intersectObjects(scene.children, true).filter((h) => {
+    const raw = raycaster.intersectObjects(scene.children, true).filter((h) => {
       let o = h.object;
       while (o) {
         if (o.userData?.ghost || o === ghost || o === ignoreRoot) return false;
@@ -242,6 +259,7 @@ export function createPlacementController({
       }
       return true;
     });
+    return remapHits(raw);
   }
 
   function onClick(event) {
@@ -309,6 +327,8 @@ export function createPlacementController({
       teIndex: pose.teIndex,
       abutting: pose.abutting,
       feedback: pose.feedback,
+      railLetter: pose.railLetter,
+      rowIndex: pose.rowIndex,
     };
 
     // Reset catalog selection after place

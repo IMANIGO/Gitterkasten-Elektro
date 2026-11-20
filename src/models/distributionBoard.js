@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { UV, UV_POSITION } from "../layout.js";
 import { materials } from "../materials.js";
 import { DIN_RAIL_MOUNT_Y, DIN_RAIL_MOUNT_Z } from "../placement/snap.js";
+import { railLabel, railLetter } from "../placement/uvRails.js";
 import { MM, toMm } from "../units.js";
 import { makeTextPlate } from "./labels.js";
 
@@ -374,17 +375,19 @@ export function createDistributionBoard({
 
   const rows = [];
   for (let row = 0; row < UV.rows; row++) {
+    const letter = railLetter(row);
     const railGroup = new THREE.Group();
-    railGroup.name = `Reihe ${row + 1}`;
+    railGroup.name = railLabel(row);
     railGroup.userData = {
       pickable: true,
-      id: `hutschiene-${row + 1}`,
-      name: `Hutschiene Reihe ${row + 1}`,
+      id: `hutschiene-${letter.toLowerCase()}`,
+      name: railLabel(row),
       meta: `TH35-7,5 · ${UV.te} TE · ${toMm(UV.railLength)} mm · frei belegbar`,
       mount: "din",
       teCapacity: UV.te,
       railLength: UV.railLength,
       rowIndex: row,
+      railLetter: letter,
     };
     const rail = createDinRail(UV.railLength);
     railGroup.add(rail);
@@ -392,11 +395,11 @@ export function createDistributionBoard({
       new THREE.PlaneGeometry(UV.railLength + 10 * MM, UV.slotH + 18 * MM),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
     );
-    slot.name = "Reihenfeld";
+    slot.name = "Schienenfeld";
     slot.position.set(0, 50 * MM, 18 * MM);
     railGroup.add(slot);
     if (!ghost) {
-      const label = makeTextPlate(`Reihe ${row + 1}`, 36, 8, { bg: "#2c3034", fg: "#f2f0ea", size: 52 });
+      const label = makeTextPlate(railLabel(row), 36, 8, { bg: "#2c3034", fg: "#f2f0ea", size: 52 });
       label.position.set(-UV.railLength / 2 + 22 * MM, 28 * MM, 14 * MM);
       noRay(label);
       railGroup.add(label);

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { getCatalogItem } from "../catalog/index.js";
 import { EBOX_FLOOR_Y } from "../layout.js";
 import { createFromFactory } from "../models/factories.js";
+import { railLabel } from "../placement/uvRails.js";
 import { setState, state } from "../state.js";
 import { toMm } from "../units.js";
 
@@ -75,10 +76,14 @@ function formatPosition(object) {
   const parts = [`X ${xMm} mm`, `Y ${yMm} mm (über Boden)`, `Z ${zMm} mm`];
   if (place?.face && place.face !== "din") parts.unshift(`Fläche: ${faceDe(place.face)}`);
   if (place?.mount === "din" && place.teIndex != null) {
+    const rail =
+      place.railLetter != null
+        ? `Schiene ${place.railLetter}`
+        : object.parent?.userData?.rowIndex != null
+          ? railLabel(object.parent.userData.rowIndex)
+          : "Hutschiene";
     parts.unshift(
-      place.abutting
-        ? `Hutschiene · Pos. ${place.teIndex + 1}`
-        : `Hutschiene · TE ${place.teIndex + 1}`,
+      place.abutting ? `${rail} · Pos. ${place.teIndex + 1}` : `${rail} · TE ${place.teIndex + 1}`,
     );
   }
   if (place?.feedback) parts.push(place.feedback);
@@ -107,6 +112,7 @@ export function createSelectionController({
   placedRoot,
   placement,
   controls,
+  getUvView,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -117,6 +123,10 @@ export function createSelectionController({
   let suppressClickMove = false;
   /** Set when a click (not a drag) already relocated the selection, so the empty click keeps it. */
   let keepSelectionOnEmptyClick = false;
+
+  function uvView() {
+    return typeof getUvView === "function" ? getUvView() : getUvView;
+  }
 
   function clearSelection() {
     setSelectedHighlight(selected, false);
@@ -161,7 +171,14 @@ export function createSelectionController({
   function pickPlaced(event) {
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(placedRoot.children, true);
+    const view = uvView();
+    const targets = [placedRoot];
+    const displayRoot = view?.isActive?.() ? view.getDisplayRoot?.() || view.getDisplay?.() : null;
+    if (displayRoot) targets.push(displayRoot);
+    const hits = raycaster.intersectObjects(targets, true).map((hit) => {
+      if (!view?.isActive?.() || !view.remapHit) return hit;
+      return view.remapHit(hit);
+    });
     // Mehrere Meshes entlang des Strahls (UV-Rahmen vor DIN-Gerät) —
     // zuerst Nicht-Container (DIN/Klemme/AP), sonst UV-Container.
     let containerHit = null;
@@ -254,6 +271,8 @@ export function createSelectionController({
       teIndex: pose.teIndex,
       abutting: pose.abutting,
       feedback: pose.feedback,
+      railLetter: pose.railLetter,
+      rowIndex: pose.rowIndex,
     };
   }
 
@@ -327,7 +346,7 @@ export function createSelectionController({
     setState({
       selectionAction: "move",
       selectedCatalogId: null,
-      placementFeedback: "Ziehen, neue Stelle anklicken oder Maß eintragen",
+      placementFeedback: "Ziehen, neue Stelle anklicken oder Schiene/TE eintragen",
     });
   }
 
@@ -360,6 +379,8 @@ export function createSelectionController({
         teIndex: pose.teIndex,
         abutting: pose.abutting,
         feedback: pose.feedback,
+        railLetter: pose.railLetter,
+        rowIndex: pose.rowIndex,
       };
       setSelectedHighlight(selected, true);
       setState({
@@ -390,6 +411,8 @@ export function createSelectionController({
           teIndex: pose.teIndex,
           abutting: pose.abutting,
           feedback: pose.feedback,
+          railLetter: pose.railLetter,
+          rowIndex: pose.rowIndex,
         };
       } else {
         factoryObject.position.copy(pos);

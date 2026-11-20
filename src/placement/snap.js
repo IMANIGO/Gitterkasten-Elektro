@@ -5,6 +5,7 @@ import {
   UV,
 } from "../layout.js";
 import { GRID_PITCH, MM, TE, toMm } from "../units.js";
+import { railLetter as letterForRow } from "./uvRails.js";
 
 /**
  * Snap a world coordinate to the 50 mm Lochblech raster.
@@ -42,12 +43,25 @@ export function snapToAbutting(localX, widthM, railLength = UV.railLength) {
   return Math.min(max, Math.max(min, stepped));
 }
 
-export function formatSnapFeedback({ face, xMm, yMm, zMm, teIndex, teWidth, mount, widthMm, abutting, exact }) {
+export function formatSnapFeedback({
+  face,
+  xMm,
+  yMm,
+  zMm,
+  teIndex,
+  teWidth,
+  mount,
+  widthMm,
+  abutting,
+  exact,
+  railLetter,
+}) {
+  const rail = railLetter ? `Schiene ${railLetter}` : "Hutschiene";
   if (mount === "din" && abutting && widthMm != null) {
-    return `Hutschiene · bündig ${widthMm} mm · Pos. ${teIndex != null ? teIndex + 1 : "–"}`;
+    return `${rail} · bündig ${widthMm} mm · Pos. ${teIndex != null ? teIndex + 1 : "–"}`;
   }
   if (mount === "din" && teIndex != null) {
-    return `Hutschiene · TE ${teIndex + 1}${teWidth > 1 ? `–${teIndex + teWidth}` : ""} · ${teWidth} TE`;
+    return `${rail} · TE ${teIndex + 1}${teWidth > 1 ? `–${teIndex + teWidth}` : ""} · ${teWidth} TE`;
   }
   const parts = [];
   if (face) parts.push(faceLabel(face));
@@ -264,6 +278,7 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
     }
   }
 
+  const railLetter = letterForRow(railGroup?.userData?.rowIndex);
   return {
     position: { x, y: DIN_RAIL_MOUNT_Y, z: DIN_RAIL_MOUNT_Z },
     rotation: { x: 0, y: 0, z: 0 },
@@ -274,6 +289,7 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
       teWidth: abutting ? null : teWidth,
       widthMm: abutting ? opts.widthMm ?? toMm(widthM) : null,
       abutting: !!abutting,
+      railLetter,
     }),
     face: "din",
     mount: "din",
@@ -281,6 +297,8 @@ export function poseOnDinRail(railGroup, localPoint, opts = {}) {
     teWidth: abutting ? null : teWidth,
     widthM,
     abutting: !!abutting,
+    railLetter,
+    rowIndex: railGroup?.userData?.rowIndex,
   };
 }
 

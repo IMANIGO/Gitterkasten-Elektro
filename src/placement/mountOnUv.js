@@ -60,6 +60,8 @@ export function mountCatalogOnUvRail(uvRoot, catalogId, { row = 0, teIndex = 0 }
     teIndex: pose.teIndex,
     abutting: pose.abutting,
     feedback: pose.feedback,
+    railLetter: pose.railLetter,
+    rowIndex: pose.rowIndex,
   };
   return object;
 }

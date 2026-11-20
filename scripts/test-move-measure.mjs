@@ -1,9 +1,9 @@
 import { chromium } from "playwright";
 import { getCatalogItem } from "../src/catalog/index.js";
 import {
-  dinMeasureFromLocal,
+  dinTeFromLocal,
   panelMeasuresFromWorld,
-  poseFromDinMeasure,
+  poseFromDinTe,
   poseFromPanelMeasures,
 } from "../src/placement/measures.js";
 import { poseOnLochblech } from "../src/placement/snap.js";
@@ -18,9 +18,12 @@ const leftRead = panelMeasuresFromWorld("left", left.position);
 const floor = poseFromPanelMeasures("floor", 220, 160, depth);
 const floorRead = panelMeasuresFromWorld("floor", floor.position);
 const grid = poseOnLochblech("back", { x: back.position.x, y: back.position.y, z: 0 }, depth);
-const rail = { userData: { railLength: UV.railLength, mount: "din", name: "Reihe 1" } };
-const din = poseFromDinMeasure(rail, 47, getCatalogItem("ls-1p"));
-const dinRead = dinMeasureFromLocal(din.position.x, UV.railLength);
+const rail = {
+  userData: { railLength: UV.railLength, mount: "din", name: "Schiene A", rowIndex: 0, railLetter: "A" },
+};
+const dinItem = getCatalogItem("ls-1p");
+const din = poseFromDinTe(rail, 3, dinItem);
+const dinRead = dinTeFromLocal(din.position.x, dinItem, UV.railLength);
 
 const unit = {
   backA: backRead.a,
@@ -32,7 +35,8 @@ const unit = {
   floorB: floorRead.b,
   gridSnaps: grid.feedback.includes("Raster 50 mm"),
   exactOmitsGrid: !back.feedback.includes("Raster"),
-  dinFromLeft: dinRead,
+  dinTe: dinRead,
+  dinFeedback: din.feedback,
 };
 console.log(JSON.stringify({ unit }, null, 2));
 
@@ -130,13 +134,14 @@ await pick("ls-1p");
 const dinOffer = await page.evaluate(() => {
   const form = document.getElementById("measure-place");
   return {
-    text: form?.innerText || "",
-    selects: form?.querySelectorAll("select").length || 0,
+    title: document.getElementById("place-form-title")?.textContent,
     a: document.getElementById("place-a-label")?.textContent,
     bHidden: document.getElementById("place-b-wrap")?.hidden,
+    railHidden: document.getElementById("place-rail-wrap")?.hidden,
+    button: document.getElementById("btn-place-measure")?.textContent?.trim(),
   };
 });
-await page.fill("#place-a", "47");
+await page.fill("#place-a", "3");
 await page.click("#btn-place-measure");
 await page.waitForTimeout(40);
 const noRail = await page.evaluate(() => {
@@ -150,13 +155,13 @@ const noRail = await page.evaluate(() => {
 await pick("schalter-aus");
 const buttonGhost = await readMoveButton();
 const placeOffer = await page.evaluate(() => {
-  const form = document.getElementById("measure-place");
   return {
-    text: form?.innerText || "",
-    selects: form?.querySelectorAll("select").length || 0,
+    title: document.getElementById("place-form-title")?.textContent,
     a: document.getElementById("place-a-label")?.textContent,
     b: document.getElementById("place-b-label")?.textContent,
     bHidden: document.getElementById("place-b-wrap")?.hidden,
+    railHidden: document.getElementById("place-rail-wrap")?.hidden,
+    button: document.getElementById("btn-place-measure")?.textContent?.trim(),
   };
 });
 await page.fill("#place-a", "137");
@@ -261,10 +266,11 @@ cancelled.point = !!emptyPoint;
 const afterCancel = await dragOutlet();
 
 const moveOffer = await page.evaluate(() => {
-  const form = document.getElementById("measure-move");
   return {
-    text: form?.innerText || "",
-    selects: form?.querySelectorAll("select").length || 0,
+    title: document.getElementById("move-form-title")?.textContent,
+    railHidden: document.getElementById("move-rail-wrap")?.hidden,
+    a: document.getElementById("move-a-label")?.textContent,
+    button: document.getElementById("btn-move-measure")?.textContent?.trim() || "",
     verschieben: document.getElementById("btn-move")?.textContent?.trim() || "",
   };
 });
@@ -304,7 +310,8 @@ await page.fill("#place-b", "280");
 await page.click("#btn-place-measure");
 await page.waitForFunction(() => document.getElementById("measure-place").hidden);
 await pick("ls-1p");
-await page.fill("#place-a", "47");
+await page.selectOption("#place-rail", { index: 0 });
+await page.fill("#place-a", "3");
 await page.click("#btn-place-measure");
 await page.waitForTimeout(80);
 
@@ -315,14 +322,15 @@ const dinPlaced = await page.evaluate(() => {
   });
   if (!device) return { missing: true };
   const railObject = device.parent;
-  const fromLeft = Math.round((device.position.x + railObject.userData.railLength / 2) * 1000);
   return {
     mount: railObject.userData?.mount,
     rowIndex: railObject.userData?.rowIndex,
+    railLetter: railObject.userData?.railLetter,
     id: railObject.userData?.id,
-    fromLeft,
+    te: device.userData?.placement?.teIndex,
     feedback: window.__pruefwand.state.placementFeedback,
     moveLabel: document.getElementById("move-a-label")?.textContent,
+    railHidden: document.getElementById("move-rail-wrap")?.hidden,
   };
 });
 
@@ -331,6 +339,7 @@ const rowShift = await page.evaluate(() => {
   window.__pruefwand.scene.traverse((object) => {
     if (object.userData?.mount === "din" && object.userData.railLength) rails.push(object);
   });
+  rails.sort((a, b) => (a.userData?.rowIndex ?? 0) - (b.userData?.rowIndex ?? 0));
   let device = null;
   window.__pruefwand.scene.traverse((object) => {
     if (object.userData?.catalogId === "ls-1p" && object.userData.placed) device = object;
@@ -340,10 +349,12 @@ const rowShift = await page.evaluate(() => {
   rail.add(device);
   device.position.x = localX;
   document.activeElement?.blur?.();
-  window.__pruefwand.setState({ placementFeedback: "reihe" });
-  return { id: rail.userData.id, rowIndex: rail.userData.rowIndex };
+  window.__pruefwand.selection.selectObject(device);
+  window.__pruefwand.setState({ placementFeedback: "schiene" });
+  return { id: rail.userData.id, rowIndex: rail.userData.rowIndex, railLetter: rail.userData.railLetter };
 });
-await page.fill("#move-a", "90");
+await page.selectOption("#move-rail", { index: 2 });
+await page.fill("#move-a", "5");
 await page.click("#btn-move-measure");
 await page.waitForTimeout(40);
 const keptRow = await page.evaluate(() => {
@@ -355,7 +366,8 @@ const keptRow = await page.evaluate(() => {
   return {
     id: rail?.userData?.id,
     rowIndex: rail?.userData?.rowIndex,
-    fromLeft: Math.round((device.position.x + rail.userData.railLength / 2) * 1000),
+    railLetter: rail?.userData?.railLetter,
+    te: device?.userData?.placement?.teIndex,
     face: device?.userData?.placement?.face,
   };
 });
@@ -448,7 +460,8 @@ const pass =
   unit.floorB === 160 &&
   unit.gridSnaps &&
   unit.exactOmitsGrid &&
-  unit.dinFromLeft === 47 &&
+  unit.dinTe === 3 &&
+  String(unit.dinFeedback).includes("Schiene A") &&
   placed.count === 1 &&
   placed.x === -351 &&
   placed.yFromBottom === 213 &&
@@ -506,22 +519,23 @@ const pass =
   clickedPlace.count === 1 &&
   clickedPlace.catalog == null &&
   clickedPlace.action == null &&
-  dinOffer.selects === 0 &&
-  dinOffer.a === "Mitte von links auf der Schiene" &&
+  dinOffer.title === "In der Verteilung platzieren" &&
+  dinOffer.a === "Erste Teilungseinheit (TE)" &&
   dinOffer.bHidden === true &&
-  !dinOffer.text.includes("Fläche") &&
-  !dinOffer.text.includes("Reihe") &&
+  dinOffer.railHidden === false &&
+  dinOffer.button === "An Schiene/TE platzieren" &&
   noRail.feedback === "Keine Hutschiene im Aufbau" &&
   noRail.placed === false &&
-  placeOffer.selects === 0 &&
+  placeOffer.title === "Maß platzieren" &&
   placeOffer.a === "Von links" &&
   placeOffer.b === "Von unten" &&
   placeOffer.bHidden === false &&
-  !placeOffer.text.includes("Fläche") &&
-  !placeOffer.text.includes("Reihe") &&
-  moveOffer.selects === 0 &&
-  !moveOffer.text.includes("Fläche") &&
-  !moveOffer.text.includes("Reihe") &&
+  placeOffer.railHidden === true &&
+  placeOffer.button === "An Maß platzieren" &&
+  moveOffer.title === "Maß" &&
+  moveOffer.railHidden === true &&
+  moveOffer.a === "Von links" &&
+  moveOffer.button === "An Maß setzen" &&
   moveOffer.verschieben === "Verschieben" &&
   leftLabels.face === "left" &&
   leftLabels.a === "Von der Rückwand" &&
@@ -532,11 +546,14 @@ const pass =
   keptFace.z === Math.round(shiftedLeft.position.z * 1000) &&
   dinPlaced.mount === "din" &&
   dinPlaced.rowIndex === 0 &&
-  dinPlaced.fromLeft === 47 &&
-  dinPlaced.moveLabel === "Mitte von links auf der Schiene" &&
+  dinPlaced.railLetter === "A" &&
+  dinPlaced.te === 2 &&
+  dinPlaced.moveLabel === "Erste Teilungseinheit (TE)" &&
+  dinPlaced.railHidden === false &&
   keptRow.id === rowShift.id &&
   keptRow.rowIndex === 2 &&
-  keptRow.fromLeft === 90 &&
+  keptRow.railLetter === "C" &&
+  keptRow.te === 4 &&
   keptRow.face === "din";
 
 console.log(JSON.stringify({ pass }));
